@@ -1,0 +1,646 @@
+/* ============================================================
+ * content.css (v3.0) — 选股行情助手浮动卡片样式
+ * 新增：Tab 切换、资金流向、相关个股、公告列表
+ * ============================================================ */
+
+#stock-quote-card {
+  --sqc-up: #e33232;
+  --sqc-down: #00a750;
+  --sqc-bg: #ffffff;
+  --sqc-border: #e0e0e0;
+  --sqc-text: #333333;
+  --sqc-label: #888888;
+  --sqc-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --sqc-btn-hover: #f0f0f5;
+
+  position: fixed;
+  z-index: 2147483647;
+  width: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--sqc-border);
+  background: var(--sqc-bg);
+  box-shadow: var(--sqc-shadow);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  color: var(--sqc-text);
+  line-height: 1.5;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: auto;
+  user-select: none;
+}
+
+#stock-quote-card.sqc-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── 头部 ─────────────────────────────────────────── */
+#stock-quote-card .sqc-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+#stock-quote-card .sqc-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-code {
+  font-size: 12px;
+  color: var(--sqc-label);
+  letter-spacing: 0.5px;
+  margin-right: auto;
+}
+
+/* ── 头部按钮组 ───────────────────────────────────── */
+#stock-quote-card .sqc-icon-btn {
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+#stock-quote-card .sqc-icon-btn:hover {
+  background: var(--sqc-btn-hover);
+  color: #888;
+}
+
+#stock-quote-card .sqc-star.sqc-starred {
+  color: #f5a623;
+}
+
+#stock-quote-card .sqc-pin {
+  opacity: 0.45;
+}
+
+#stock-quote-card .sqc-pin.sqc-pinned {
+  opacity: 1;
+  filter: hue-rotate(0deg);
+}
+
+#stock-quote-card .sqc-close {
+  font-size: 18px;
+  color: #bbb;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+
+#stock-quote-card .sqc-close:hover {
+  color: #666;
+}
+
+/* ── 主体 ─────────────────────────────────────────── */
+#stock-quote-card .sqc-body {
+  padding: 12px 14px;
+}
+
+/* ── 价格行 ───────────────────────────────────────── */
+#stock-quote-card .sqc-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+#stock-quote-card .sqc-price {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+#stock-quote-card .sqc-change,
+#stock-quote-card .sqc-pct {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 涨 / 跌颜色 */
+#stock-quote-card .sqc-up {
+  color: var(--sqc-up);
+}
+
+#stock-quote-card .sqc-down {
+  color: var(--sqc-down);
+}
+
+/* ── 数据网格 ─────────────────────────────────────── */
+#stock-quote-card .sqc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+#stock-quote-card .sqc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#stock-quote-card .sqc-label {
+  color: var(--sqc-label);
+  font-size: 12px;
+}
+
+#stock-quote-card .sqc-val {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* ── 分时图区域 ───────────────────────────────────── */
+#stock-quote-card .sqc-chart-wrap {
+  padding: 0 6px 4px;
+}
+
+#stock-quote-card .sqc-chart {
+  display: block;
+}
+
+#stock-quote-card .sqc-chart-time {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px 0 52px;
+  margin-top: -2px;
+}
+
+#stock-quote-card .sqc-chart-time span {
+  font-size: 10px;
+  color: var(--sqc-label);
+}
+
+/* ── 预警面板 ─────────────────────────────────────── */
+#stock-quote-card .sqc-alert-panel {
+  padding: 8px 14px 12px;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 4px;
+}
+
+#stock-quote-card .sqc-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#stock-quote-card .sqc-alert-type {
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--sqc-border);
+  border-radius: 4px;
+  background: var(--sqc-bg);
+  color: var(--sqc-text);
+  cursor: pointer;
+}
+
+#stock-quote-card .sqc-alert-val {
+  width: 70px;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--sqc-border);
+  border-radius: 4px;
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-alert-unit {
+  font-size: 12px;
+  color: var(--sqc-label);
+  min-width: 12px;
+}
+
+#stock-quote-card .sqc-alert-set {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 3px 12px;
+  border: none;
+  border-radius: 4px;
+  background: #339af0;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#stock-quote-card .sqc-alert-set:hover {
+  background: #228be6;
+}
+
+#stock-quote-card .sqc-alert-done {
+  text-align: center;
+  font-size: 12px;
+  color: #00a750;
+  padding: 4px 0;
+}
+
+/* ── 加载 / 错误 ──────────────────────────────────── */
+#stock-quote-card .sqc-loading {
+  text-align: center;
+  padding: 16px 0;
+  color: var(--sqc-label);
+  font-size: 13px;
+}
+
+#stock-quote-card .sqc-loading::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border: 2px solid #ddd;
+  border-top-color: #888;
+  border-radius: 50%;
+  animation: sqc-spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes sqc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#stock-quote-card .sqc-error {
+  text-align: center;
+  padding: 16px 0;
+  color: var(--sqc-label);
+  font-size: 13px;
+}
+
+/* ── Tab 切换栏 ───────────────────────────────────── */
+#stock-quote-card .sqc-tabs {
+  display: flex;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0 14px;
+}
+
+#stock-quote-card .sqc-tab {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--sqc-label);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+#stock-quote-card .sqc-tab:hover {
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-tab.active {
+  color: #339af0;
+  border-bottom-color: #339af0;
+  font-weight: 500;
+}
+
+#stock-quote-card .sqc-tab-panel {
+  display: none;
+}
+
+#stock-quote-card .sqc-tab-panel.active {
+  display: block;
+}
+
+/* ── 资金流向 ─────────────────────────────────────── */
+#stock-quote-card .sqc-flow-body {
+  padding: 10px 14px;
+}
+
+#stock-quote-card .sqc-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#stock-quote-card .sqc-flow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#stock-quote-card .sqc-flow-label {
+  width: 42px;
+  font-size: 12px;
+  color: var(--sqc-label);
+  flex-shrink: 0;
+}
+
+#stock-quote-card .sqc-flow-bar-wrap {
+  flex: 1;
+  height: 16px;
+  background: #f5f5f5;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+#stock-quote-card .sqc-flow-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+#stock-quote-card .sqc-bar-up {
+  background: linear-gradient(90deg, rgba(227,50,50,0.3), rgba(227,50,50,0.7));
+}
+
+#stock-quote-card .sqc-bar-down {
+  background: linear-gradient(90deg, rgba(0,167,80,0.3), rgba(0,167,80,0.7));
+}
+
+#stock-quote-card .sqc-flow-val {
+  width: 64px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+#stock-quote-card .sqc-flow-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--sqc-label);
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* ── 相关个股 ─────────────────────────────────────── */
+#stock-quote-card .sqc-related-body {
+  padding: 10px 14px;
+}
+
+#stock-quote-card .sqc-related-header {
+  font-size: 11px;
+  color: var(--sqc-label);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+#stock-quote-card .sqc-related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#stock-quote-card .sqc-related-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+#stock-quote-card .sqc-related-item:hover {
+  background: var(--sqc-btn-hover);
+}
+
+#stock-quote-card .sqc-related-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-related-code {
+  font-size: 10px;
+  color: var(--sqc-label);
+  margin-left: 6px;
+  flex: 1;
+}
+
+#stock-quote-card .sqc-related-pct {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── 公告列表 ─────────────────────────────────────── */
+#stock-quote-card .sqc-news-body {
+  padding: 10px 14px;
+}
+
+#stock-quote-card .sqc-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#stock-quote-card .sqc-news-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  background: #f9f9fc;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+
+#stock-quote-card .sqc-news-item:hover {
+  background: var(--sqc-btn-hover);
+}
+
+#stock-quote-card .sqc-news-date {
+  font-size: 10px;
+  color: var(--sqc-label);
+}
+
+#stock-quote-card .sqc-news-title {
+  font-size: 12px;
+  color: var(--sqc-text);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ── 持仓面板 ─────────────────────────────────────── */
+#stock-quote-card .sqc-position-panel {
+  padding: 8px 14px 12px;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 4px;
+}
+
+#stock-quote-card .sqc-position-info {
+  margin-bottom: 8px;
+}
+
+#stock-quote-card .sqc-pos-existing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: #f5f5fa;
+  border-radius: 4px;
+}
+
+#stock-quote-card .sqc-pos-existing span:nth-child(1) {
+  flex: 1;
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-pos-remove {
+  color: #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+
+#stock-quote-card .sqc-pos-remove:hover {
+  color: var(--sqc-up);
+}
+
+#stock-quote-card .sqc-position-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#stock-quote-card .sqc-position-row label {
+  font-size: 12px;
+  color: var(--sqc-label);
+  flex-shrink: 0;
+}
+
+#stock-quote-card .sqc-pos-cost,
+#stock-quote-card .sqc-pos-qty {
+  width: 60px;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--sqc-border);
+  border-radius: 4px;
+  color: var(--sqc-text);
+}
+
+#stock-quote-card .sqc-pos-set {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 3px 12px;
+  border: none;
+  border-radius: 4px;
+  background: #339af0;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#stock-quote-card .sqc-pos-set:hover {
+  background: #228be6;
+}
+
+#stock-quote-card .sqc-pos-toast {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  animation: sqc-fade-in 0.2s ease;
+}
+
+@keyframes sqc-fade-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ── 暗色模式适配 ─────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  #stock-quote-card {
+    --sqc-bg: #1e1e2e;
+    --sqc-border: #333344;
+    --sqc-text: #e0e0e8;
+    --sqc-label: #8888aa;
+    --sqc-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --sqc-btn-hover: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-header {
+    border-bottom-color: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-alert-panel {
+    border-top-color: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-icon-btn {
+    color: #555566;
+  }
+
+  #stock-quote-card .sqc-icon-btn:hover {
+    color: #aaaabb;
+  }
+
+  #stock-quote-card .sqc-close {
+    color: #555566;
+  }
+
+  #stock-quote-card .sqc-close:hover {
+    color: #aaaabb;
+  }
+
+  #stock-quote-card .sqc-alert-type,
+  #stock-quote-card .sqc-alert-val {
+    background: #2a2a3e;
+    border-color: #444466;
+  }
+
+  #stock-quote-card .sqc-alert-set {
+    background: #1c7ed6;
+  }
+
+  #stock-quote-card .sqc-position-panel {
+    border-top-color: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-pos-existing {
+    background: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-pos-cost,
+  #stock-quote-card .sqc-pos-qty {
+    background: #2a2a3e;
+    border-color: #444466;
+  }
+
+  #stock-quote-card .sqc-pos-set {
+    background: #1c7ed6;
+  }
+
+  #stock-quote-card .sqc-tabs {
+    border-bottom-color: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-flow-bar-wrap {
+    background: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-related-header {
+    border-bottom-color: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-news-item {
+    background: #2a2a3e;
+  }
+
+  #stock-quote-card .sqc-related-item:hover,
+  #stock-quote-card .sqc-news-item:hover {
+    background: #333344;
+  }
+}

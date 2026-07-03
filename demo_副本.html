@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>选股行情助手 v3.0 — 功能演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .header h1 {
+    font-size: 28px;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: #666;
+    font-size: 14px;
+  }
+  .badge {
+    display: inline-block;
+    background: #339af0;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .cards-row {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+
+  /* ── 模拟卡片样式 ──────────────────────────────── */
+  .demo-card {
+    width: 320px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    font-size: 13px;
+    overflow: hidden;
+  }
+  .demo-card .dc-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .demo-card .dc-name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .demo-card .dc-code {
+    font-size: 12px;
+    color: #888;
+    margin-right: auto;
+  }
+  .demo-card .dc-icon {
+    font-size: 14px;
+    color: #ccc;
+    padding: 3px 5px;
+  }
+  .demo-card .dc-close {
+    font-size: 18px;
+    color: #bbb;
+  }
+
+  .demo-card .dc-tabs {
+    display: flex;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 0 14px;
+  }
+  .demo-card .dc-tab {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #888;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .demo-card .dc-tab.active {
+    color: #339af0;
+    border-bottom-color: #339af0;
+    font-weight: 500;
+  }
+
+  .demo-card .dc-body {
+    padding: 12px 14px;
+  }
+  .demo-card .dc-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .demo-card .dc-price {
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .demo-card .dc-change {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .demo-card .up { color: #e33232; }
+  .demo-card .down { color: #00a750; }
+
+  .demo-card .dc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+  }
+  .demo-card .dc-item {
+    display: flex;
+    justify-content: space-between;
+  }
+  .demo-card .dc-label {
+    color: #888;
+    font-size: 12px;
+  }
+  .demo-card .dc-val {
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  /* ── 资金流向 ──────────────────────────────────── */
+  .demo-card .dc-flow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .demo-card .dc-flow-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .demo-card .dc-flow-label {
+    width: 42px;
+    font-size: 12px;
+    color: #888;
+  }
+  .demo-card .dc-flow-bar-wrap {
+    flex: 1;
+    height: 16px;
+    background: #f5f5f5;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .demo-card .dc-flow-bar {
+    height: 100%;
+    border-radius: 3px;
+  }
+  .demo-card .bar-up {
+    background: linear-gradient(90deg, rgba(227,50,50,0.3), rgba(227,50,50,0.7));
+  }
+  .demo-card .bar-down {
+    background: linear-gradient(90deg, rgba(0,167,80,0.3), rgba(0,167,80,0.7));
+  }
+  .demo-card .dc-flow-val {
+    width: 64px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ── 相关个股 ──────────────────────────────────── */
+  .demo-card .dc-related-header {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .demo-card .dc-related-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .demo-card .dc-related-item:hover {
+    background: #f0f0f5;
+  }
+  .demo-card .dc-related-name {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .demo-card .dc-related-code {
+    font-size: 10px;
+    color: #888;
+    margin-left: 6px;
+    flex: 1;
+  }
+  .demo-card .dc-related-pct {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ── 公告 ──────────────────────────────────────── */
+  .demo-card .dc-news-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background: #f9f9fc;
+    margin-bottom: 6px;
+    text-decoration: none;
+  }
+  .demo-card .dc-news-item:hover {
+    background: #f0f0f5;
+  }
+  .demo-card .dc-news-date {
+    font-size: 10px;
+    color: #888;
+  }
+  .demo-card .dc-news-title {
+    font-size: 12px;
+    color: #333;
+    line-height: 1.4;
+  }
+
+  /* ── 分时图 ────────────────────────────────────── */
+  .demo-card .dc-chart-wrap {
+    padding: 0 6px 4px;
+  }
+  .demo-card .dc-chart {
+    width: 100%;
+    height: 80px;
+    display: block;
+  }
+
+  .demo-card .dc-alert-panel {
+    padding: 8px 14px 12px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .demo-card .dc-alert-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .demo-card select, .demo-card input {
+    font-size: 12px;
+    padding: 3px 6px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+  }
+  .demo-card .dc-alert-set {
+    margin-left: auto;
+    font-size: 12px;
+    padding: 3px 12px;
+    border: none;
+    border-radius: 4px;
+    background: #339af0;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .feature-card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+  }
+  .feature-card .icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  .feature-card .title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .feature-card .desc {
+    font-size: 12px;
+    color: #888;
+  }
+  .feature-card.new {
+    border: 2px solid #339af0;
+  }
+  .feature-card.new .title::after {
+    content: " NEW";
+    color: #339af0;
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>选股行情助手 <span class="badge">v3.0</span></h1>
+    <p>Chrome 扩展 · 选中股票名称/代码即可查看行情 · A股/港股/美股</p>
+  </div>
+
+  <div class="section-title">功能一览</div>
+  <div class="feature-grid">
+    <div class="feature-card"><div class="icon">🖱️</div><div class="title">选中即查</div><div class="desc">选中文本自动弹出</div></div>
+    <div class="feature-card"><div class="icon">📋</div><div class="title">右键菜单</div><div class="desc">右键选中文本触发</div></div>
+    <div class="feature-card"><div class="icon">⌨️</div><div class="title">Alt+S 快捷键</div><div class="desc">键盘党专用</div></div>
+    <div class="feature-card"><div class="icon">⭐</div><div class="title">自选股收藏</div><div class="desc">Popup 查看列表</div></div>
+    <div class="feature-card"><div class="icon">📊</div><div class="title">迷你分时图</div><div class="desc">实时走势+坐标轴</div></div>
+    <div class="feature-card"><div class="icon">🔔</div><div class="title">价格预警</div><div class="desc">到达目标即通知</div></div>
+    <div class="feature-card new"><div class="icon">💰</div><div class="title">资金流向</div><div class="desc">主力/超大/大/中/小单</div></div>
+    <div class="feature-card new"><div class="icon">🔗</div><div class="title">相关个股</div><div class="desc">同行业板块推荐</div></div>
+    <div class="feature-card new"><div class="icon">📰</div><div class="title">公司公告</div><div class="desc">最新5条公告列表</div></div>
+  </div>
+
+  <div class="section-title">卡片效果预览（4 个 Tab）</div>
+  <div class="cards-row">
+    <!-- Tab 1: 行情 -->
+    <div class="demo-card">
+      <div class="dc-header">
+        <span class="dc-name">贵州茅台</span>
+        <span class="dc-code">600519</span>
+        <span class="dc-icon">📌</span>
+        <span class="dc-icon">★</span>
+        <span class="dc-icon">🔔</span>
+        <span class="dc-close">×</span>
+      </div>
+      <div class="dc-tabs">
+        <span class="dc-tab active">行情</span>
+        <span class="dc-tab">资金</span>
+        <span class="dc-tab">相关</span>
+        <span class="dc-tab">公告</span>
+      </div>
+      <div class="dc-body">
+        <div class="dc-price-row">
+          <span class="dc-price up">1191.31</span>
+          <span class="dc-change up">▼ -11.69</span>
+          <span class="dc-change up">-0.97%</span>
+        </div>
+        <div class="dc-grid">
+          <div class="dc-item"><span class="dc-label">今开</span><span class="dc-val">1203.00</span></div>
+          <div class="dc-item"><span class="dc-label">昨收</span><span class="dc-val">1203.00</span></div>
+          <div class="dc-item"><span class="dc-label">最高</span><span class="dc-val up">1210.14</span></div>
+          <div class="dc-item"><span class="dc-label">最低</span><span class="dc-val down">1190.50</span></div>
+          <div class="dc-item"><span class="dc-label">成交量</span><span class="dc-val">1.97万手</span></div>
+          <div class="dc-item"><span class="dc-label">成交额</span><span class="dc-val">23.70亿</span></div>
+          <div class="dc-item"><span class="dc-label">振幅</span><span class="dc-val">1.63%</span></div>
+        </div>
+      </div>
+      <div class="dc-chart-wrap">
+        <svg class="dc-chart" viewBox="0 0 308 80" xmlns="http://www.w3.org/2000/svg">
+          <text x="2" y="12" font-size="10" fill="#e33232" text-anchor="start">1210.14</text>
+          <text x="2" y="76" font-size="10" fill="#00a750" text-anchor="start">1190.50</text>
+          <text x="2" y="44" font-size="10" fill="#999" text-anchor="start">1203.00</text>
+          <line x1="48" y1="40" x2="304" y2="40" stroke="#999" stroke-width="0.5" stroke-dasharray="3,3"/>
+          <path d="M48,40 L55,35 L65,30 L80,28 L95,32 L110,25 L125,22 L140,28 L155,35 L170,40 L185,45 L200,50 L215,48 L230,52 L245,55 L260,58 L275,60 L290,58 L304,55 L304,76 L48,76 Z" fill="rgba(0,167,80,0.08)"/>
+          <path d="M48,40 L55,35 L65,30 L80,28 L95,32 L110,25 L125,22 L140,28 L155,35 L170,40 L185,45 L200,50 L215,48 L230,52 L245,55 L260,58 L275,60 L290,58 L304,55" stroke="#00a750" stroke-width="1.2" fill="none"/>
+          <circle cx="304" cy="55" r="2.5" fill="#00a750"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Tab 2: 资金流向 -->
+    <div class="demo-card">
+      <div class="dc-header">
+        <span class="dc-name">贵州茅台</span>
+        <span class="dc-code">600519</span>
+        <span class="dc-icon">📌</span>
+        <span class="dc-icon">★</span>
+        <span class="dc-icon">🔔</span>
+        <span class="dc-close">×</span>
+      </div>
+      <div class="dc-tabs">
+        <span class="dc-tab">行情</span>
+        <span class="dc-tab active">资金</span>
+        <span class="dc-tab">相关</span>
+        <span class="dc-tab">公告</span>
+      </div>
+      <div class="dc-body">
+        <div class="dc-flow-list">
+          <div class="dc-flow-item">
+            <span class="dc-flow-label">主力</span>
+            <div class="dc-flow-bar-wrap"><div class="dc-flow-bar bar-up" style="width:100%"></div></div>
+            <span class="dc-flow-val up">+3.04亿</span>
+          </div>
+          <div class="dc-flow-item">
+            <span class="dc-flow-label">超大单</span>
+            <div class="dc-flow-bar-wrap"><div class="dc-flow-bar bar-up" style="width:85%"></div></div>
+            <span class="dc-flow-val up">+2.58亿</span>
+          </div>
+          <div class="dc-flow-item">
+            <span class="dc-flow-label">大单</span>
+            <div class="dc-flow-bar-wrap"><div class="dc-flow-bar bar-up" style="width:15%"></div></div>
+            <span class="dc-flow-val up">+0.46亿</span>
+          </div>
+          <div class="dc-flow-item">
+            <span class="dc-flow-label">中单</span>
+            <div class="dc-flow-bar-wrap"><div class="dc-flow-bar bar-down" style="width:35%"></div></div>
+            <span class="dc-flow-val down">-1.03亿</span>
+          </div>
+          <div class="dc-flow-item">
+            <span class="dc-flow-label">小单</span>
+            <div class="dc-flow-bar-wrap"><div class="dc-flow-bar bar-up" style="width:19%"></div></div>
+            <span class="dc-flow-val up">+0.57亿</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:#888;text-align:center;opacity:0.7;">
+          数据来源：东方财富 · 单位：元
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: 相关个股 -->
+    <div class="demo-card">
+      <div class="dc-header">
+        <span class="dc-name">贵州茅台</span>
+        <span class="dc-code">600519</span>
+        <span class="dc-icon">📌</span>
+        <span class="dc-icon">★</span>
+        <span class="dc-icon">🔔</span>
+        <span class="dc-close">×</span>
+      </div>
+      <div class="dc-tabs">
+        <span class="dc-tab">行情</span>
+        <span class="dc-tab">资金</span>
+        <span class="dc-tab active">相关</span>
+        <span class="dc-tab">公告</span>
+      </div>
+      <div class="dc-body">
+        <div class="dc-related-header">所属行业：白酒</div>
+        <div class="dc-related-item">
+          <span class="dc-related-name">五粮液</span>
+          <span class="dc-related-code">000858</span>
+          <span class="dc-related-pct up">+1.23%</span>
+        </div>
+        <div class="dc-related-item">
+          <span class="dc-related-name">洋河股份</span>
+          <span class="dc-related-code">002304</span>
+          <span class="dc-related-pct down">-0.45%</span>
+        </div>
+        <div class="dc-related-item">
+          <span class="dc-related-name">泸州老窖</span>
+          <span class="dc-related-code">000568</span>
+          <span class="dc-related-pct up">+0.87%</span>
+        </div>
+        <div class="dc-related-item">
+          <span class="dc-related-name">山西汾酒</span>
+          <span class="dc-related-code">600809</span>
+          <span class="dc-related-pct up">+2.15%</span>
+        </div>
+        <div class="dc-related-item">
+          <span class="dc-related-name">古井贡酒</span>
+          <span class="dc-related-code">000596</span>
+          <span class="dc-related-pct down">-0.32%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: 公告 -->
+    <div class="demo-card">
+      <div class="dc-header">
+        <span class="dc-name">贵州茅台</span>
+        <span class="dc-code">600519</span>
+        <span class="dc-icon">📌</span>
+        <span class="dc-icon">★</span>
+        <span class="dc-icon">🔔</span>
+        <span class="dc-close">×</span>
+      </div>
+      <div class="dc-tabs">
+        <span class="dc-tab">行情</span>
+        <span class="dc-tab">资金</span>
+        <span class="dc-tab">相关</span>
+        <span class="dc-tab active">公告</span>
+      </div>
+      <div class="dc-body">
+        <a class="dc-news-item" href="#" onclick="return false">
+          <span class="dc-news-date">2026-06-22</span>
+          <span class="dc-news-title">贵州茅台:贵州茅台2025年年度权益分派实施公告</span>
+        </a>
+        <a class="dc-news-item" href="#" onclick="return false">
+          <span class="dc-news-date">2026-06-12</span>
+          <span class="dc-news-title">贵州茅台:贵州茅台关于聘任董事会秘书的公告</span>
+        </a>
+        <a class="dc-news-item" href="#" onclick="return false">
+          <span class="dc-news-date">2026-06-12</span>
+          <span class="dc-news-title">北京市金杜律师事务所关于贵州茅台酒股份有限公司2025年度股东会之法律意见书</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">安装方法</div>
+  <div style="background:#fff;padding:24px;border-radius:10px;max-width:600px;margin:0 auto;font-size:14px;line-height:2;">
+    <ol>
+      <li>打开 Chrome，地址栏输入 <code style="background:#f0f0f5;padding:2px 6px;border-radius:3px;">chrome://extensions/</code></li>
+      <li>右上角打开「<b>开发者模式</b>」开关</li>
+      <li>点击「<b>加载已解压的扩展程序</b>」</li>
+      <li>选择 <code style="background:#f0f0f5;padding:2px 6px;border-radius:3px;">stock-hover-extension</code> 文件夹</li>
+      <li>去任意网页选中股票名称（如"贵州茅台"）或代码（如"600519"）即可看到行情卡片弹出</li>
+      <li>卡片内切换「资金」「相关」「公告」Tab 查看更多数据</li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>
