@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 — 选股行情助手</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f0f2f5;
+      --card-bg: #fff;
+      --border: #e8e8e8;
+      --text: #1a1a1a;
+      --text-sub: #888;
+      --blue: #1890ff;
+      --radius: 8px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    .header h1 { font-size: 20px; }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .card h2 { font-size: 15px; margin-bottom: 16px; }
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 14px; }
+    .setting-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+    .setting-control select, .setting-control input[type="number"] {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .btn {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-danger { background: #e8493e; color: #fff; }
+    .btn-danger:hover { opacity: 0.85; }
+    .data-stats {
+      display: flex;
+      gap: 12px;
+      margin: 12px 0;
+    }
+    .data-stat {
+      flex: 1;
+      background: var(--bg);
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .data-stat-num { font-size: 22px; font-weight: 700; color: var(--blue); }
+    .data-stat-label { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 8px 24px;
+      border-radius: 6px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --text-sub: #8b949e;
+      }
+      .data-stat { background: #21262d; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span style="font-size:24px">⚙️</span>
+      <h1>设置</h1>
+    </div>
+
+    <!-- 主题设置 -->
+    <div class="card">
+      <h2>🎨 外观</h2>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">主题模式</div>
+          <div class="setting-desc">选择界面配色方案</div>
+        </div>
+        <div class="setting-control">
+          <select id="themeMode">
+            <option value="auto">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 刷新设置 -->
+    <div class="card">
+      <h2>🔄 数据刷新</h2>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">盘中自动刷新间隔</div>
+          <div class="setting-desc">交易时间内自动刷新行情（秒）</div>
+        </div>
+        <div class="setting-control">
+          <input type="number" id="refreshInterval" min="3" max="60" value="5" style="width:60px"> 秒
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">预警检查间隔</div>
+          <div class="setting-desc">价格预警轮询周期（秒）</div>
+        </div>
+        <div class="setting-control">
+          <input type="number" id="alertInterval" min="10" max="120" value="30" style="width:60px"> 秒
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据统计 -->
+    <div class="card">
+      <h2>📊 数据概览</h2>
+      <div class="data-stats" id="dataStats">
+        <div class="data-stat">
+          <div class="data-stat-num" id="statWatchlist">0</div>
+          <div class="data-stat-label">自选股</div>
+        </div>
+        <div class="data-stat">
+          <div class="data-stat-num" id="statPortfolio">0</div>
+          <div class="data-stat-label">持仓</div>
+        </div>
+        <div class="data-stat">
+          <div class="data-stat-num" id="statAlerts">0</div>
+          <div class="data-stat-label">预警</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据导入导出 -->
+    <div class="card">
+      <h2>💾 数据备份</h2>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">导出全部数据</div>
+          <div class="setting-desc">导出自选股、持仓、预警为 JSON 文件</div>
+        </div>
+        <div class="setting-control">
+          <button class="btn btn-primary" id="btnExport">导出 JSON</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">导出持仓 CSV</div>
+          <div class="setting-desc">导出持仓明细为 Excel 可用的 CSV</div>
+        </div>
+        <div class="setting-control">
+          <button class="btn btn-outline" id="btnExportCSV">导出 CSV</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">导入数据</div>
+          <div class="setting-desc">从 JSON 文件恢复数据（会覆盖现有数据）</div>
+        </div>
+        <div class="setting-control">
+          <input type="file" id="importFile" accept=".json" style="display:none">
+          <button class="btn btn-outline" id="btnImport">导入 JSON</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label" style="color:#e8493e">⚠️ 清空所有数据</div>
+          <div class="setting-desc">删除全部自选股、持仓和预警（不可恢复）</div>
+        </div>
+        <div class="setting-control">
+          <button class="btn btn-danger" id="btnClear">清空</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="card">
+      <h2>ℹ️ 关于</h2>
+      <div style="font-size:13px;color:var(--text-sub);line-height:1.8">
+        <div><strong>选股行情助手</strong> v6.0.0</div>
+        <div>Chrome Extension (Manifest V3)</div>
+        <div>数据源：东方财富 API + 腾讯接口 Fallback</div>
+        <div style="margin-top:8px">
+          <a href="https://github.com/whgx/stock-hover-extension" target="_blank" style="color:var(--blue)">GitHub 仓库 →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── 加载设置 ──
+    function loadSettings() {
+      chrome.storage.local.get(["settings"], (result) => {
+        const s = result.settings || {};
+        document.getElementById("themeMode").value = s.themeMode || "auto";
+        document.getElementById("refreshInterval").value = s.refreshInterval || 5;
+        document.getElementById("alertInterval").value = s.alertInterval || 30;
+      });
+    }
+
+    // ── 保存设置 ──
+    function saveSettings() {
+      const settings = {
+        themeMode: document.getElementById("themeMode").value,
+        refreshInterval: parseInt(document.getElementById("refreshInterval").value) || 5,
+        alertInterval: parseInt(document.getElementById("alertInterval").value) || 30,
+      };
+      chrome.storage.local.set({ settings }, () => {
+        showToast("设置已保存");
+      });
+    }
+
+    // ── 数据统计 ──
+    function loadDataStats() {
+      chrome.storage.local.get(["watchlist", "portfolio", "alerts"], (result) => {
+        document.getElementById("statWatchlist").textContent = (result.watchlist || []).length;
+        document.getElementById("statPortfolio").textContent = (result.portfolio || []).length;
+        document.getElementById("statAlerts").textContent = (result.alerts || []).length;
+      });
+    }
+
+    // ── 导出 JSON ──
+    function exportJSON() {
+      chrome.storage.local.get(["watchlist", "portfolio", "alerts", "settings"], (result) => {
+        const data = {
+          exportDate: new Date().toISOString(),
+          watchlist: result.watchlist || [],
+          portfolio: result.portfolio || [],
+          alerts: result.alerts || [],
+          settings: result.settings || {},
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "stock-assistant-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("已导出 JSON 文件");
+      });
+    }
+
+    // ── 导出 CSV ──
+    function exportCSV() {
+      chrome.storage.local.get(["portfolio"], (result) => {
+        const portfolio = result.portfolio || [];
+        if (portfolio.length === 0) {
+          showToast("暂无持仓数据");
+          return;
+        }
+        const header = "名称,代码,数量,成本价,买入日期\n";
+        const rows = portfolio.map((p) =>
+          `"${p.name || ""}","${p.code || ""}",${p.quantity || 0},${p.avgCost || 0},"${p.buyDate || ""}"`
+        ).join("\n");
+        const csv = "\uFEFF" + header + rows; // BOM for Excel
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "portfolio-" + new Date().toISOString().slice(0, 10) + ".csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("已导出 CSV 文件");
+      });
+    }
+
+    // ── 导入 JSON ──
+    function importJSON(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.watchlist && !data.portfolio && !data.alerts) {
+            showToast("文件格式不正确");
+            return;
+          }
+          const toSet = {};
+          if (data.watchlist) toSet.watchlist = data.watchlist;
+          if (data.portfolio) toSet.portfolio = data.portfolio;
+          if (data.alerts) toSet.alerts = data.alerts;
+          if (data.settings) toSet.settings = data.settings;
+          chrome.storage.local.set(toSet, () => {
+            showToast("导入成功！");
+            loadDataStats();
+          });
+        } catch (err) {
+          showToast("文件解析失败");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ── 清空数据 ──
+    function clearAllData() {
+      if (!confirm("确定要清空所有数据吗？此操作不可恢复！")) return;
+      if (!confirm("再次确认：所有自选股、持仓、预警将被永久删除！")) return;
+      chrome.storage.local.remove(["watchlist", "portfolio", "alerts"], () => {
+        showToast("已清空所有数据");
+        loadDataStats();
+      });
+    }
+
+    // ── Toast ──
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2000);
+    }
+
+    // ── 事件绑定 ──
+    document.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      loadDataStats();
+
+      document.getElementById("themeMode").addEventListener("change", saveSettings);
+      document.getElementById("refreshInterval").addEventListener("change", saveSettings);
+      document.getElementById("alertInterval").addEventListener("change", saveSettings);
+      document.getElementById("btnExport").addEventListener("click", exportJSON);
+      document.getElementById("btnExportCSV").addEventListener("click", exportCSV);
+      document.getElementById("btnImport").addEventListener("click", () => {
+        document.getElementById("importFile").click();
+      });
+      document.getElementById("importFile").addEventListener("change", (e) => {
+        if (e.target.files[0]) importJSON(e.target.files[0]);
+        e.target.value = "";
+      });
+      document.getElementById("btnClear").addEventListener("click", clearAllData);
+    });
+  </script>
+</body>
+</html>

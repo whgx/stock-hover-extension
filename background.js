@@ -840,6 +840,174 @@ async function fetchMarketSentiment() {
 }
 
 // ════════════════════════════════════════════════════════════
+// 18. 龙虎榜数据
+// ════════════════════════════════════════════════════════════
+async function fetchDragonTiger() {
+  const url =
+    "https://datacenter-web.eastmoney.com/api/data/v1/get?" +
+    "sortColumns=TRADE_DATE&sortTypes=-1&pageSize=20&pageNumber=1" +
+    "&reportName=RPT_DAILYBILLBOARD_DETAILS" +
+    "&columns=ALL&source=WEB&client=WEB";
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const items = json?.result?.data ?? [];
+    return items.map((i) => ({
+      code: i.SECURITY_CODE,
+      name: i.SECURITY_NAME_ABBR,
+      price: i.CLOSE_PRICE,
+      pct: i.PCT_CHANGE,
+      netBuy: i.NET_AMOUNT,
+      reason: i.EXPLAIN,
+      date: i.TRADE_DATE?.slice(0, 10),
+    }));
+  } catch (e) {
+    console.error("[行情助手] 龙虎榜获取失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 19. 涨停板/跌停板列表
+// ════════════════════════════════════════════════════════════
+async function fetchLimitBoard(type = "up") {
+  // type: "up"=涨停, "down"=跌停
+  const sortField = type === "up" ? "f3" : "f3";
+  const sortDir = type === "up" ? "1" : "1";
+  const filter = type === "up" ? "f3:>=9.8" : "f3:<=-9.8";
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+    "&fid=" + sortField + "&po=" + sortDir + "&pz=50&pn=1" +
+    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+    "&fields=f2,f3,f4,f5,f6,f7,f8,f12,f14,f15,f16,f17,f18";
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const diff = json?.data?.diff ?? [];
+    const items = Array.isArray(diff) ? diff : Object.values(diff);
+    return items
+      .filter((i) => type === "up" ? i.f3 >= 9.8 : i.f3 <= -9.8)
+      .map((i) => ({
+        code: i.f12,
+        name: i.f14,
+        price: i.f2,
+        pct: i.f3,
+        turnover: i.f8,
+        amount: i.f6,
+        amountStr: i.f6 >= 1e8 ? (i.f6 / 1e8).toFixed(2) + "亿" : (i.f6 / 1e4).toFixed(0) + "万",
+      }));
+  } catch (e) {
+    console.error("[行情助手] 涨跌停获取失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 20. 个股新闻列表
+// ════════════════════════════════════════════════════════════
+async function fetchStockNews(code) {
+  const url =
+    "https://search-api-web.eastmoney.com/search/jsonp?" +
+    "cb=jQuery&param=%7B%22uid%22%3A%22%22%2C%22keyword%22%3A%22" +
+    encodeURIComponent(code) +
+    "%22%2C%22type%22%3A%5B%22cmsArticleWebOld%22%5D%2C%22client%22%3A%22web%22%2C%22clientType%22%3A%22web%22%2C%22clientVersion%22%3A%22curr%22%2C%22param%22%3A%7B%22cmsArticleWebOld%22%3A%7B%22searchScope%22%3A%22default%22%2C%22sort%22%3A%22default%22%2C%22pageIndex%22%3A1%2C%22pageSize%22%3A10%7D%7D%7D";
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const text = await resp.text();
+    // JSONP 格式解析
+    const jsonStr = text.replace(/^jQuery\(?/, "").replace(/\);?$/, "");
+    const json = JSON.parse(jsonStr);
+    const items = json?.result?.cmsArticleWebOld?.list ?? [];
+    return items.map((a) => ({
+      title: a.title,
+      date: a.date?.slice(0, 10),
+      url: a.url,
+      source: a.source,
+    }));
+  } catch (e) {
+    console.error("[行情助手] 新闻获取失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 21. 个股财务指标
+// ════════════════════════════════════════════════════════════
+async function fetchFinanceData(code) {
+  // code 需要带市场前缀：SH/SZ/BJ
+  const marketCode = /^(6|9)/.test(code) ? "SH" : /^(0|3|2)/.test(code) ? "SZ" : "BJ";
+  const url =
+    "https://emweb.securities.eastmoney.com/PC_HSF10/NewFinanceAnalysis/MainTargetAjax?" +
+    "type=0&code=" + marketCode + code;
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const items = json?.data ?? [];
+    if (items.length === 0) return null;
+    const latest = items[0];
+    return {
+      reportDate: latest.REPORT_DATE?.slice(0, 10),
+      pe: latest.PE_TTM,
+      pb: latest.PB_LYR,
+      roe: latest.ROEJQ,
+      revenue: latest.YSTZ,
+      netProfit: latest.SJLTZ,
+      grossMargin: latest.XSMLL,
+      netMargin: latest.JLL,
+      revenueYoY: latest.YSYYSRZZL,
+      profitYoY: latest.GJLRZZL,
+      totalAssets: latest.ZCZZ,
+      netAssets: latest.JZC,
+      eps: latest.MGJYXJJE,
+    };
+  } catch (e) {
+    console.error("[行情助手] 财务指标获取失败:", e);
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 22. 热门股票排行（涨幅/跌幅/成交额）
+// ════════════════════════════════════════════════════════════
+async function fetchHotStocks(rankType = "amount") {
+  // rankType: "amount"(成交额) / "gainer"(涨幅) / "loser"(跌幅) / "turnover"(换手率)
+  const fidMap = {
+    amount: "f6",
+    gainer: "f3",
+    loser: "f3",
+    turnover: "f8",
+  };
+  const po = rankType === "loser" ? "0" : "1";
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+    "&fid=" + (fidMap[rankType] || "f6") + "&po=" + po + "&pz=20&pn=1" +
+    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+    "&fields=f2,f3,f4,f5,f6,f7,f8,f12,f14,f15,f16,f17,f18";
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const diff = json?.data?.diff ?? [];
+    const items = Array.isArray(diff) ? diff : Object.values(diff);
+    return items.map((i) => ({
+      code: i.f12,
+      name: i.f14,
+      price: i.f2,
+      pct: i.f3,
+      change: i.f4,
+      turnover: i.f8,
+      amount: i.f6,
+      amountStr: i.f6 >= 1e8 ? (i.f6 / 1e8).toFixed(2) + "亿" : (i.f6 / 1e4).toFixed(0) + "万",
+      amplitude: i.f7,
+    }));
+  } catch (e) {
+    console.error("[行情助手] 热门股获取失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 // 9. 消息路由中心
 // ════════════════════════════════════════════════════════════
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -1010,6 +1178,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case "getMarketSentiment": {
         const sentiment = await fetchMarketSentiment();
         return { success: true, data: sentiment };
+      }
+
+      // ── 龙虎榜 ──
+      case "getDragonTiger": {
+        const data = await fetchDragonTiger();
+        return { success: true, data };
+      }
+
+      // ── 涨停/跌停板 ──
+      case "getLimitBoard": {
+        const data = await fetchLimitBoard(request.type || "up");
+        return { success: true, data };
+      }
+
+      // ── 个股新闻 ──
+      case "getStockNews": {
+        const data = await fetchStockNews(request.code);
+        return { success: true, data };
+      }
+
+      // ── 财务指标 ──
+      case "getFinance": {
+        const data = await fetchFinanceData(request.code);
+        if (!data) return { success: false, error: "无财务数据" };
+        return { success: true, data };
+      }
+
+      // ── 热门股票排行 ──
+      case "getHotStocks": {
+        const data = await fetchHotStocks(request.rankType || "amount");
+        return { success: true, data };
       }
 
       default:
