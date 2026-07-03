@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>选股行情助手 — Chrome 浏览器选股插件 | 悬浮查行情、自选股、分时图、价格预警</title>
+<meta name="description" content="一款轻量级 Chrome 浏览器扩展，选中股票名称即可悬浮查看实时行情。支持 A 股 / 港股 / 美股，自选股管理、迷你分时图、价格预警、资金流向、持仓盈亏跟踪。">
+<style>
+:root {
+  --up: #e33232;
+  --down: #00a750;
+  --primary: #339af0;
+  --primary-dark: #228be6;
+  --bg: #ffffff;
+  --bg-alt: #f8f9fa;
+  --text: #1a1a2e;
+  --text-light: #6c757d;
+  --border: #e9ecef;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12);
+  --radius: 16px;
+  --max-w: 1080px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; display: block; }
+
+.container {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ════════════════ NAVBAR ════════════════ */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-logo {
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-logo .logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--primary), #74c0fc);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.nav-links a {
+  font-size: 14px;
+  color: var(--text-light);
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--primary); }
+.nav-cta {
+  background: var(--primary);
+  color: #fff !important;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.nav-cta:hover { background: var(--primary-dark); }
+
+@media (max-width: 640px) {
+  .nav-links a:not(.nav-cta) { display: none; }
+}
+
+/* ════════════════ HERO ════════════════ */
+.hero {
+  padding: 120px 0 80px;
+  background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+  position: relative;
+  overflow: hidden;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #e7f5ff;
+  color: var(--primary);
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 20px;
+  letter-spacing: -1px;
+}
+@media (max-width: 640px) {
+  .hero h1 { font-size: 34px; }
+}
+.hero h1 .highlight {
+  background: linear-gradient(135deg, var(--primary), #74c0fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p.subtitle {
+  font-size: 18px;
+  color: var(--text-light);
+  margin-bottom: 32px;
+  max-width: 500px;
+}
+.hero-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(51, 154, 240, 0.3);
+}
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(51, 154, 240, 0.4);
+}
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.hero-stats {
+  display: flex;
+  gap: 40px;
+  margin-top: 40px;
+}
+.hero-stat-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+}
+.hero-stat-label {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* ── Hero 卡片预览 ── */
+.hero-preview {
+  position: relative;
+}
+.hero-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 340px;
+  padding: 0;
+  transform: rotate(-2deg);
+  transition: transform 0.3s;
+}
+.hero-card:hover { transform: rotate(0deg); }
+.hero-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.hero-card-header .name {
+  font-size: 15px;
+  font-weight: 700;
+}
+.hero-card-header .code {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-left: auto;
+}
+.hero-card-header .pin {
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+}
+.hero-card-body {
+  padding: 14px 16px;
+}
+.hero-card-price {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--up);
+}
+.hero-card-change {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--up);
+  margin-left: 10px;
+}
+.hero-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.hero-card-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.hero-card-item .lbl { color: var(--text-light); }
+.hero-card-item .val { font-weight: 600; }
+.hero-card-chart {
+  margin-top: 10px;
+  height: 60px;
+  background: linear-gradient(180deg, rgba(227,50,50,0.08), transparent);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-card-chart svg {
+  width: 100%;
+  height: 100%;
+}
+.hero-card-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px 12px;
+}
+.hero-card-tab {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+.hero-card-tab.active {
+  background: #e7f5ff;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* 浮动装饰 */
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.15;
+  z-index: 0;
+}
+.hero-blob-1 {
+  width: 300px;
+  height: 300px;
+  background: var(--primary);
+  top: 10%;
+  right: -50px;
+}
+.hero-blob-2 {
+  width: 200px;
+  height: 200px;
+  background: var(--up);
+  bottom: 10%;
+  left: -30px;
+}
+
+/* ════════════════ SECTION TITLE ════════════════ */
+.section { padding: 80px 0; }
+.section-alt { background: var(--bg-alt); }
+.section-title {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.section-title h2 {
+  font-size: 36px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+}
+@media (max-width: 640px) {
+  .section-title h2 { font-size: 28px; }
+}
+.section-title p {
+  font-size: 16px;
+  color: var(--text-light);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ════════════════ FEATURES ════════════════ */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .features-grid { grid-template-columns: 1fr; }
+}
+.feature-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+.feature-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), #74c0fc);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s;
+}
+.feature-card:hover::before { transform: scaleX(1); }
+.feature-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+.feature-icon.bg-blue { background: #e7f5ff; }
+.feature-icon.bg-red { background: #fff5f5; }
+.feature-icon.bg-green { background: #f0fff4; }
+.feature-icon.bg-yellow { background: #fff9db; }
+.feature-icon.bg-purple { background: #f3f0ff; }
+.feature-icon.bg-cyan { background: #e3fafc; }
+.feature-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.feature-card p {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.65;
+}
+
+/* ════════════════ HOW IT WORKS ════════════════ */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  counter-reset: step;
+}
+@media (max-width: 768px) {
+  .steps { grid-template-columns: 1fr; gap: 32px; }
+}
+.step {
+  text-align: center;
+  position: relative;
+}
+.step-num {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #74c0fc);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  box-shadow: 0 4px 14px rgba(51, 154, 240, 0.3);
+}
+.step h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.step p {
+  font-size: 14px;
+  color: var(--text-light);
+  max-width: 280px;
+  margin: 0 auto;
+}
+.step-arrow {
+  position: absolute;
+  top: 28px;
+  right: -28px;
+  color: var(--primary);
+  font-size: 24px;
+  opacity: 0.3;
+}
+@media (max-width: 768px) {
+  .step-arrow { display: none; }
+}
+
+/* ════════════════ MARKET SUPPORT ════════════════ */
+.markets {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+.market-item {
+  text-align: center;
+}
+.market-flag {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.market-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.market-desc {
+  font-size: 13px;
+  color: var(--text-light);
+}
+.market-examples {
+  font-size: 12px;
+  color: var(--primary);
+  margin-top: 4px;
+}
+
+/* ════════════════ DEMO SECTIONS ════════════════ */
+.demo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  align-items: center;
+  margin-bottom: 80px;
+}
+.demo-row:last-child { margin-bottom: 0; }
+.demo-row.reverse .demo-visual { order: -1; }
+@media (max-width: 900px) {
+  .demo-row { grid-template-columns: 1fr; gap: 40px; }
+  .demo-row.reverse .demo-visual { order: 0; }
+}
+.demo-text h3 {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.demo-text p {
+  font-size: 15px;
+  color: var(--text-light);
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
+.demo-features-list {
+  list-style: none;
+}
+.demo-features-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.demo-features-list li .check {
+  color: var(--down);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── 模拟UI ── */
+.demo-visual { display: flex; justify-content: center; }
+
+/* Popup 模拟 */
+.popup-mock {
+  width: 340px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.popup-mock-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.popup-mock-search {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.popup-mock-search-box {
+  background: var(--bg-alt);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.popup-mock-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.popup-mock-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--text-light);
+  border-bottom: 2px solid transparent;
+}
+.popup-mock-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+.popup-mock-list {
+  padding: 8px 0;
+}
+.popup-mock-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 10px;
+  transition: background 0.1s;
+}
+.popup-mock-item:hover { background: var(--bg-alt); }
+.popup-mock-item-info { flex: 1; }
+.popup-mock-item-name { font-size: 13px; font-weight: 600; }
+.popup-mock-item-code { font-size: 11px; color: var(--text-light); }
+.popup-mock-item-price {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+.popup-mock-item-pct {
+  font-size: 11px;
+}
+
+/* 资金流向模拟 */
+.flow-mock {
+  width: 300px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+}
+.flow-mock h4 {
+  font-size: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.flow-mock-bar-item {
+  margin-bottom: 12px;
+}
+.flow-mock-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.flow-mock-bar-label .val { font-weight: 600; }
+.flow-mock-bar-track {
+  height: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.flow-mock-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  animation: flow-grow 1.5s ease-out;
+}
+@keyframes flow-grow {
+  from { width: 0; }
+}
+.flow-mock-bar-fill.up {
+  background: linear-gradient(90deg, rgba(227,50,50,0.3), rgba(227,50,50,0.8));
+}
+.flow-mock-bar-fill.down {
+  background: linear-gradient(90deg, rgba(0,167,80,0.3), rgba(0,167,80,0.8));
+}
+
+/* 预警模拟 */
+.alert-mock {
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.alert-mock-header {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fa5252, #ff8787);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.alert-mock-body {
+  padding: 16px;
+}
+.alert-mock-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.alert-mock-item:last-child { border-bottom: none; }
+.alert-mock-item-info { flex: 1; }
+.alert-mock-item-name { font-size: 13px; font-weight: 600; }
+.alert-mock-item-desc { font-size: 11px; color: var(--text-light); }
+.alert-mock-item-status {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.alert-mock-item-status.triggered {
+  background: #fff5f5;
+  color: var(--up);
+}
+.alert-mock-item-status.active {
+  background: #f0fff4;
+  color: var(--down);
+}
+
+/* 持仓模拟 */
+.portfolio-mock {
+  width: 340px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.portfolio-mock-summary {
+  padding: 20px 16px;
+  text-align: center;
+  background: linear-gradient(135deg, #f8f9fa, #fff);
+  border-bottom: 1px solid var(--border);
+}
+.portfolio-mock-summary .total {
+  font-size: 32px;
+  font-weight: 800;
+}
+.portfolio-mock-summary .total.up { color: var(--up); }
+.portfolio-mock-summary .total.down { color: var(--down); }
+.portfolio-mock-summary .label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+.portfolio-mock-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.portfolio-mock-item:last-child { border-bottom: none; }
+.portfolio-mock-item-info { flex: 1; }
+.portfolio-mock-item-name { font-size: 13px; font-weight: 600; }
+.portfolio-mock-item-detail { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.portfolio-mock-item-profit {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ════════════════ TECH STACK ════════════════ */
+.tech-grid {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tech-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.tech-badge:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+/* ════════════════ CTA SECTION ════════════════ */
+.cta-section {
+  background: linear-gradient(135deg, var(--primary), #74c0fc);
+  padding: 80px 0;
+  text-align: center;
+  color: #fff;
+}
+.cta-section h2 {
+  font-size: 36px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.cta-section p {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-bottom: 32px;
+}
+.cta-section .btn-white {
+  background: #fff;
+  color: var(--primary);
+  padding: 16px 40px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.cta-section .btn-white:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* ════════════════ FOOTER ════════════════ */
+.footer {
+  background: #1a1a2e;
+  color: #888;
+  padding: 48px 0 32px;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 32px;
+}
+@media (max-width: 768px) {
+  .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+}
+.footer-brand h3 {
+  color: #fff;
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+.footer-brand p {
+  font-size: 14px;
+  max-width: 400px;
+}
+.footer-col h4 {
+  color: #fff;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+.footer-col a {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 8px;
+  transition: color 0.2s;
+}
+.footer-col a:hover { color: var(--primary); }
+.footer-bottom {
+  border-top: 1px solid #333;
+  padding-top: 24px;
+  text-align: center;
+  font-size: 13px;
+}
+
+/* ════════════════ ANIMATIONS ════════════════ */
+.fade-up {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .fade-up { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ NAVBAR ══════════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <span class="logo-icon">📊</span>
+      <span>选股行情助手</span>
+    </div>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#demo">演示</a>
+      <a href="#install">安装</a>
+      <a href="https://github.com/whgx/stock-hover-extension" target="_blank" class="nav-cta">⭐ GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero">
+  <div class="hero-blob hero-blob-1"></div>
+  <div class="hero-blob hero-blob-2"></div>
+  <div class="container" style="position: relative; z-index: 1;">
+    <div class="hero-grid">
+      <div class="hero-content">
+        <div class="hero-badge">🔥 v4.1 · 免费 · 开源</div>
+        <h1>选中股票名<br><span class="highlight">行情秒出</span></h1>
+        <p class="subtitle">一款轻量级 Chrome 浏览器扩展。在任何网页上选中股票名称或代码，即时弹出实时行情卡片，无需打开新标签页。</p>
+        <div class="hero-actions">
+          <a href="#install" class="btn-primary">
+            <span>⚡</span> 立即安装
+          </a>
+          <a href="https://github.com/whgx/stock-hover-extension" target="_blank" class="btn-secondary">
+            <span>⭐</span> 源码
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div>
+            <div class="hero-stat-val">3</div>
+            <div class="hero-stat-label">市场覆盖（A股/港股/美股）</div>
+          </div>
+          <div>
+            <div class="hero-stat-val">10+</div>
+            <div class="hero-stat-label">核心功能</div>
+          </div>
+          <div>
+            <div class="hero-stat-val">0</div>
+            <div class="hero-stat-label">费用 · 完全免费</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-preview">
+        <div class="hero-card">
+          <div class="hero-card-header">
+            <span class="name">贵州茅台</span>
+            <span class="code">600519 · SH</span>
+            <span class="pin">📌</span>
+          </div>
+          <div class="hero-card-body">
+            <div>
+              <span class="hero-card-price">1708.00</span>
+              <span class="hero-card-change">+28.50 +1.70%</span>
+            </div>
+            <div class="hero-card-grid">
+              <div class="hero-card-item"><span class="lbl">今开</span><span class="val" style="color:var(--up)">1705.00</span></div>
+              <div class="hero-card-item"><span class="lbl">最高</span><span class="val" style="color:var(--up)">1712.50</span></div>
+              <div class="hero-card-item"><span class="lbl">昨收</span><span class="val">1679.50</span></div>
+              <div class="hero-card-item"><span class="lbl">最低</span><span class="val" style="color:var(--down)">1698.00</span></div>
+            </div>
+            <div class="hero-card-chart">
+              <svg viewBox="0 0 300 60" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="rgba(227,50,50,0.15)"/>
+                    <stop offset="100%" stop-color="rgba(227,50,50,0)"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,35 L20,30 L40,32 L60,25 L80,28 L100,20 L120,22 L140,15 L160,18 L180,12 L200,15 L220,10 L240,14 L260,8 L280,11 L300,5 L300,60 L0,60 Z" fill="url(#chartGrad)"/>
+                <path d="M0,35 L20,30 L40,32 L60,25 L80,28 L100,20 L120,22 L140,15 L160,18 L180,12 L200,15 L220,10 L240,14 L260,8 L280,11 L300,5" stroke="#e33232" stroke-width="1.5" fill="none"/>
+              </svg>
+            </div>
+          </div>
+          <div class="hero-card-tabs">
+            <div class="hero-card-tab active">📊 行情</div>
+            <div class="hero-card-tab">💰 资金</div>
+            <div class="hero-card-tab">🔗 相关</div>
+            <div class="hero-card-tab">📰 公告</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-title">
+      <h2>功能一览</h2>
+      <p>从实时行情到持仓管理，一应俱全</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-blue">🖱️</div>
+        <h3>悬浮查行情</h3>
+        <p>在任何网页上选中股票名称或代码，自动弹出实时行情卡片。也支持右键菜单和 Alt+S 快捷键触发。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-red">📈</div>
+        <h3>迷你分时图</h3>
+        <p>内置 Canvas 高清分时走势图，标注最高/最低/昨收，动态时间轴，一眼掌握当日走势。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-yellow">⭐</div>
+        <h3>自选股管理</h3>
+        <p>一键收藏自选股，Popup 面板中实时展示所有自选股行情，涨红跌绿一目了然。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-purple">🔔</div>
+        <h3>价格预警</h3>
+        <p>设定涨破/跌破价格，后台自动轮询监控，触发条件后通过 Chrome 通知系统桌面推送提醒。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-cyan">💰</div>
+        <h3>资金流向</h3>
+        <p>展示主力/超大单/大单/中单/小单资金净流入柱状图，洞察主力资金动向。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-green">💼</div>
+        <h3>持仓盈亏跟踪</h3>
+        <p>记录买入价和数量，自动计算加权成本、浮动盈亏金额和百分比，全局持仓汇总。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-blue">🔗</div>
+        <h3>相关个股</h3>
+        <p>同板块成份股一览，快速发现同行业联动机会，点击即可跳转查看。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-yellow">📰</div>
+        <h3>公司公告</h3>
+        <p>最新公司公告列表，点击直达东方财富公告详情页，不错过任何重要信息。</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon bg-red">🔍</div>
+        <h3>模糊搜索</h3>
+        <p>Popup 内置模糊搜索，支持中文名称、代码、拼音首字母，250ms 防抖，键盘上下导航。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ MARKETS ══════════ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-title">
+      <h2>三大市场全覆盖</h2>
+      <p>A 股、港股、美股，一个插件全搞定</p>
+    </div>
+    <div class="markets">
+      <div class="market-item fade-up">
+        <div class="market-flag">🇨🇳</div>
+        <div class="market-name">A 股</div>
+        <div class="market-desc">沪深两市</div>
+        <div class="market-examples">600519 · 000858 · 300750</div>
+      </div>
+      <div class="market-item fade-up">
+        <div class="market-flag">🇭🇰</div>
+        <div class="market-name">港股</div>
+        <div class="market-desc">港交所</div>
+        <div class="market-examples">00700 · 09988 · 03690</div>
+      </div>
+      <div class="market-item fade-up">
+        <div class="market-flag">🇺🇸</div>
+        <div class="market-name">美股</div>
+        <div class="market-desc">纳斯达克 / 纽交所</div>
+        <div class="market-examples">AAPL · TSLA · NVDA</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ DEMO SECTIONS ══════════ -->
+<section class="section" id="demo">
+  <div class="container">
+    <div class="section-title">
+      <h2>核心体验</h2>
+      <p>看看它如何融入你的投资工作流</p>
+    </div>
+
+    <!-- Demo 1: Popup 管理面板 -->
+    <div class="demo-row">
+      <div class="demo-text fade-up">
+        <h3>一站式管理面板</h3>
+        <p>点击工具栏图标打开 Popup，顶部模糊搜索直达任意股票，底部三大 Tab 管理你的全部投资数据。</p>
+        <ul class="demo-features-list">
+          <li><span class="check">✓</span> 模糊搜索：名称 / 代码 / 拼音首字母</li>
+          <li><span class="check">✓</span> 自选股：实时行情 + 涨跌排行</li>
+          <li><span class="check">✓</span> 价格预警：添加 / 编辑 / 删除</li>
+          <li><span class="check">✓</span> 持仓盈亏：行内编辑 + 全局汇总</li>
+          <li><span class="check">✓</span> Tab 角标实时显示各模块数量</li>
+        </ul>
+      </div>
+      <div class="demo-visual fade-up">
+        <div class="popup-mock">
+          <div class="popup-mock-header">📊 选股行情助手</div>
+          <div class="popup-mock-search">
+            <div class="popup-mock-search-box">🔍 输入股票名称/代码/拼音...</div>
+          </div>
+          <div class="popup-mock-tabs">
+            <div class="popup-mock-tab active">自选股 <span style="background:var(--up);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px;">4</span></div>
+            <div class="popup-mock-tab">价格预警 <span style="background:var(--up);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px;">2</span></div>
+            <div class="popup-mock-tab">持仓 <span style="background:var(--up);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px;">3</span></div>
+          </div>
+          <div class="popup-mock-list">
+            <div class="popup-mock-item">
+              <div class="popup-mock-item-info">
+                <div class="popup-mock-item-name">贵州茅台</div>
+                <div class="popup-mock-item-code">600519</div>
+              </div>
+              <div class="popup-mock-item-price" style="color:var(--up)">1708.00</div>
+              <div class="popup-mock-item-pct" style="color:var(--up)">+1.70%</div>
+            </div>
+            <div class="popup-mock-item">
+              <div class="popup-mock-item-info">
+                <div class="popup-mock-item-name">宁德时代</div>
+                <div class="popup-mock-item-code">300750</div>
+              </div>
+              <div class="popup-mock-item-price" style="color:var(--up)">215.60</div>
+              <div class="popup-mock-item-pct" style="color:var(--up)">+2.35%</div>
+            </div>
+            <div class="popup-mock-item">
+              <div class="popup-mock-item-info">
+                <div class="popup-mock-item-name">比亚迪</div>
+                <div class="popup-mock-item-code">002594</div>
+              </div>
+              <div class="popup-mock-item-price" style="color:var(--down)">238.50</div>
+              <div class="popup-mock-item-pct" style="color:var(--down)">-0.88%</div>
+            </div>
+            <div class="popup-mock-item">
+              <div class="popup-mock-item-info">
+                <div class="popup-mock-item-name">腾讯控股</div>
+                <div class="popup-mock-item-code">00700 · HK</div>
+              </div>
+              <div class="popup-mock-item-price" style="color:var(--up)">385.40</div>
+              <div class="popup-mock-item-pct" style="color:var(--up)">+1.22%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo 2: 资金流向 -->
+    <div class="demo-row reverse">
+      <div class="demo-text fade-up">
+        <h3>资金流向一目了然</h3>
+        <p>切换到「资金」Tab，主力资金动向尽收眼底。超大单、大单、中单、小单分层展示，柱状图直观呈现多空力量对比。</p>
+        <ul class="demo-features-list">
+          <li><span class="check">✓</span> 主力净流入金额与方向</li>
+          <li><span class="check">✓</span> 超大单 / 大单 / 中单 / 小单分层</li>
+          <li><span class="check">✓</span> 红绿柱状图可视化对比</li>
+          <li><span class="check">✓</span> 数据实时刷新</li>
+        </ul>
+      </div>
+      <div class="demo-visual fade-up">
+        <div class="flow-mock">
+          <h4>资金流向 · 贵州茅台</h4>
+          <div class="flow-mock-bar-item">
+            <div class="flow-mock-bar-label">
+              <span>主力净流入</span>
+              <span class="val" style="color:var(--up)">+3.25亿</span>
+            </div>
+            <div class="flow-mock-bar-track">
+              <div class="flow-mock-bar-fill up" style="width: 72%"></div>
+            </div>
+          </div>
+          <div class="flow-mock-bar-item">
+            <div class="flow-mock-bar-label">
+              <span>超大单</span>
+              <span class="val" style="color:var(--up)">+2.18亿</span>
+            </div>
+            <div class="flow-mock-bar-track">
+              <div class="flow-mock-bar-fill up" style="width: 65%"></div>
+            </div>
+          </div>
+          <div class="flow-mock-bar-item">
+            <div class="flow-mock-bar-label">
+              <span>大单</span>
+              <span class="val" style="color:var(--up)">+1.07亿</span>
+            </div>
+            <div class="flow-mock-bar-track">
+              <div class="flow-mock-bar-fill up" style="width: 35%"></div>
+            </div>
+          </div>
+          <div class="flow-mock-bar-item">
+            <div class="flow-mock-bar-label">
+              <span>中单</span>
+              <span class="val" style="color:var(--down)">-0.82亿</span>
+            </div>
+            <div class="flow-mock-bar-track">
+              <div class="flow-mock-bar-fill down" style="width: 28%"></div>
+            </div>
+          </div>
+          <div class="flow-mock-bar-item">
+            <div class="flow-mock-bar-label">
+              <span>小单</span>
+              <span class="val" style="color:var(--down)">-2.43亿</span>
+            </div>
+            <div class="flow-mock-bar-track">
+              <div class="flow-mock-bar-fill down" style="width: 55%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo 3: 价格预警 -->
+    <div class="demo-row">
+      <div class="demo-text fade-up">
+        <h3>智能价格预警</h3>
+        <p>设定目标价格，插件在后台自动轮询监控。一旦触发条件，立即通过 Chrome 桌面通知推送提醒，绝不错过买卖时机。</p>
+        <ul class="demo-features-list">
+          <li><span class="check">✓</span> 支持涨破 / 跌破双向预警</li>
+          <li><span class="check">✓</span> 后台 chrome.alarms 自动轮询</li>
+          <li><span class="check">✓</span> Chrome 桌面通知推送</li>
+          <li><span class="check">✓</span> Popup 内一键添加 / 编辑 / 删除</li>
+          <li><span class="check">✓</span> 卡片内 📑 按钮快速设置</li>
+        </ul>
+      </div>
+      <div class="demo-visual fade-up">
+        <div class="alert-mock">
+          <div class="alert-mock-header">🔔 价格预警管理</div>
+          <div class="alert-mock-body">
+            <div class="alert-mock-item">
+              <div class="alert-mock-item-info">
+                <div class="alert-mock-item-name">贵州茅台 600519</div>
+                <div class="alert-mock-item-desc">涨破 1750.00 · 当前 1708.00</div>
+              </div>
+              <div class="alert-mock-item-status active">监控中</div>
+            </div>
+            <div class="alert-mock-item">
+              <div class="alert-mock-item-info">
+                <div class="alert-mock-item-name">宁德时代 300750</div>
+                <div class="alert-mock-item-desc">跌破 200.00 · 当前 215.60</div>
+              </div>
+              <div class="alert-mock-item-status active">监控中</div>
+            </div>
+            <div class="alert-mock-item">
+              <div class="alert-mock-item-info">
+                <div class="alert-mock-item-name">比亚迪 002594</div>
+                <div class="alert-mock-item-desc" style="color:var(--up)">✅ 已触发：涨破 240.00</div>
+              </div>
+              <div class="alert-mock-item-status triggered">已触发</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo 4: 持仓盈亏 -->
+    <div class="demo-row reverse">
+      <div class="demo-text fade-up">
+        <h3>持仓盈亏实时跟踪</h3>
+        <p>在卡片或 Popup 中添加持仓信息（买入价 + 数量），插件自动计算加权成本和浮动盈亏。多次买入自动累加，全局汇总一眼看懂总资产表现。</p>
+        <ul class="demo-features-list">
+          <li><span class="check">✓</span> 加权成本自动计算</li>
+          <li><span class="check">✓</span> 浮动盈亏金额 + 百分比</li>
+          <li><span class="check">✓</span> Popup 内行内编辑</li>
+          <li><span class="check">✓</span> 全局持仓汇总（总盈亏）</li>
+          <li><span class="check">✓</span> 数据本地持久化存储</li>
+        </ul>
+      </div>
+      <div class="demo-visual fade-up">
+        <div class="portfolio-mock">
+          <div class="portfolio-mock-summary">
+            <div class="total up">+15,328.50</div>
+            <div class="label" style="color:var(--up)">总浮动盈亏 +4.82%</div>
+          </div>
+          <div class="portfolio-mock-item">
+            <div class="portfolio-mock-item-info">
+              <div class="portfolio-mock-item-name">贵州茅台</div>
+              <div class="portfolio-mock-item-detail">成本 1650.00 · 100股</div>
+            </div>
+            <div class="portfolio-mock-item-profit" style="color:var(--up)">+5,800</div>
+          </div>
+          <div class="portfolio-mock-item">
+            <div class="portfolio-mock-item-info">
+              <div class="portfolio-mock-item-name">宁德时代</div>
+              <div class="portfolio-mock-item-detail">成本 198.50 · 80股</div>
+            </div>
+            <div class="portfolio-mock-item-profit" style="color:var(--up)">+1,368</div>
+          </div>
+          <div class="portfolio-mock-item">
+            <div class="portfolio-mock-item-info">
+              <div class="portfolio-mock-item-name">比亚迪</div>
+              <div class="portfolio-mock-item-detail">成本 245.00 · 100股</div>
+            </div>
+            <div class="portfolio-mock-item-profit" style="color:var(--down)">-650</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ HOW IT WORKS ══════════ -->
+<section class="section section-alt" id="install">
+  <div class="container">
+    <div class="section-title">
+      <h2>三步上手</h2>
+      <p>不到一分钟，开始使用</p>
+    </div>
+    <div class="steps">
+      <div class="step fade-up">
+        <div class="step-num">1</div>
+        <h3>下载安装</h3>
+        <p>从 GitHub 下载源码，打开 <code>chrome://extensions</code>，开启「开发者模式」，点击「加载已解压的扩展程序」。</p>
+        <div class="step-arrow">→</div>
+      </div>
+      <div class="step fade-up">
+        <div class="step-num">2</div>
+        <h3>选中即查</h3>
+        <p>在任何网页上选中股票名称（如「贵州茅台」），行情卡片自动弹出。或使用右键菜单、Alt+S 快捷键。</p>
+        <div class="step-arrow">→</div>
+      </div>
+      <div class="step fade-up">
+        <div class="step-num">3</div>
+        <h3>管理投资</h3>
+        <p>点击工具栏图标打开 Popup，搜索股票、添加自选、设置预警、记录持仓，一站式管理你的全部投资数据。</p>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 48px;">
+      <a href="https://github.com/whgx/stock-hover-extension" target="_blank" class="btn-primary">
+        <span>⬇</span> 前往 GitHub 下载
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ TECH STACK ══════════ -->
+<section class="section">
+  <div class="container">
+    <div class="section-title">
+      <h2>技术栈</h2>
+      <p>轻量、安全、无后端依赖</p>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-badge">🧩 Chrome Extension Manifest V3</div>
+      <div class="tech-badge">⚡ Service Worker</div>
+      <div class="tech-badge">🎨 Canvas 分时图</div>
+      <div class="tech-badge">💾 chrome.storage 本地存储</div>
+      <div class="tech-badge">⏰ chrome.alarms 后台轮询</div>
+      <div class="tech-badge">🔔 chrome.notifications 桌面推送</div>
+      <div class="tech-badge">🌐 东方财富 API</div>
+      <div class="tech-badge">🔄 腾讯接口 Fallback</div>
+      <div class="tech-badge">🌙 暗色模式适配</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CTA ══════════ -->
+<section class="cta-section">
+  <div class="container">
+    <h2>开始你的高效选股之旅</h2>
+    <p>免费 · 开源 · 无需注册</p>
+    <a href="https://github.com/whgx/stock-hover-extension" target="_blank" class="btn-white">
+      <span>⭐</span> Star on GitHub
+    </a>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <h3>📊 选股行情助手</h3>
+        <p>一款轻量级 Chrome 浏览器扩展，选中即查行情，支持自选股、分时图、价格预警、资金流向、持仓盈亏。</p>
+      </div>
+      <div class="footer-col">
+        <h4>资源</h4>
+        <a href="https://github.com/whgx/stock-hover-extension" target="_blank">GitHub 仓库</a>
+        <a href="#install">安装指南</a>
+        <a href="#features">功能列表</a>
+      </div>
+      <div class="footer-col">
+        <h4>数据来源</h4>
+        <a href="https://www.eastmoney.com/" target="_blank">东方财富网</a>
+        <a href="https://gu.qq.com/" target="_blank">腾讯证券</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>选股行情助手 v4.1 · 数据仅供参考，不构成投资建议 · 投资有风险，入市需谨慎</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+// 滚动动画
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+// 导航栏滚动效果
+let lastScroll = 0;
+const nav = document.querySelector('.nav');
+window.addEventListener('scroll', () => {
+  const current = window.scrollY;
+  if (current > 80) {
+    nav.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)';
+  } else {
+    nav.style.boxShadow = 'none';
+  }
+  lastScroll = current;
+});
+</script>
+
+</body>
+</html>

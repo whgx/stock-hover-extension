@@ -105,6 +105,14 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("已刷新");
   });
 
+  // ── 打开工作台 ────────────────────────────────────
+  const openDash = (e) => {
+    if (e) e.preventDefault();
+    chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  };
+  document.getElementById("openDashboard")?.addEventListener("click", openDash);
+  document.getElementById("openDashboardFooter")?.addEventListener("click", openDash);
+
   // 初始加载
   loadWatchlist();
   loadAllCounts();

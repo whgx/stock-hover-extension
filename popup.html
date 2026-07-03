@@ -23,6 +23,21 @@
     font-weight: 600;
     flex: 1;
   }
+  .dashboard-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid #339af0;
+    border-radius: 4px;
+    background: #fff;
+    color: #339af0;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .dashboard-btn:hover {
+    background: #339af0;
+    color: #fff;
+  }
   .tab-bar {
     display: flex;
     background: #fff;
@@ -432,6 +447,7 @@
 
 <div class="header">
   <h1>📊 选股行情助手</h1>
+  <button id="openDashboard" class="dashboard-btn" title="打开全屏投资工作台 (Alt+D)">🖥️ 工作台</button>
 </div>
 
 <!-- 搜索框（始终显示，所有 Tab 共用） -->
@@ -460,6 +476,8 @@
 
 <div class="footer">
   <a href="#" id="refreshBtn">🔄 刷新行情</a>
+  <span style="color:#ddd;margin:0 4px">|</span>
+  <a href="#" id="openDashboardFooter">🖥️ 打开工作台</a>
 </div>
 
 <div id="toast" class="toast"></div>

@@ -269,12 +269,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // 6. 快捷键 (Alt+S)
 // ════════════════════════════════════════════════════════════
 chrome.commands.onCommand.addListener((command) => {
-  if (command !== "search-stock") return;
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      chrome.tabs.sendMessage(tabs[0].id, { type: "QUERY_SELECTED" });
-    }
-  });
+  if (command === "search-stock") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: "QUERY_SELECTED" });
+      }
+    });
+  } else if (command === "open-dashboard") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  }
 });
 
 // ════════════════════════════════════════════════════════════
@@ -613,6 +616,230 @@ async function getPortfolioQuotes() {
 }
 
 // ════════════════════════════════════════════════════════════
+// 14. K线数据（日K + 均线）
+// ════════════════════════════════════════════════════════════
+async function fetchKlineData(secid, count = 120) {
+  const url =
+    "https://push2his.eastmoney.com/api/qt/stock/kline/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32" +
+    "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13" +
+    "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61" +
+    "&klt=101&fqt=1&secid=" + secid +
+    "&lmt=" + count;
+
+  try {
+    const resp = await fetch(url);
+    const json = await resp.json();
+    const klines = json?.data?.klines ?? [];
+    if (klines.length === 0) return null;
+
+    // 格式: "2025-01-02,open,close,high,low,volume,amount,amplitude,pct,change,turnover"
+    const candles = klines.map((k) => {
+      const parts = k.split(",");
+      return {
+        date: parts[0],
+        open: parseFloat(parts[1]),
+        close: parseFloat(parts[2]),
+        high: parseFloat(parts[3]),
+        low: parseFloat(parts[4]),
+        volume: parseFloat(parts[5]),
+        amount: parseFloat(parts[6]),
+        pct: parseFloat(parts[9]),
+      };
+    });
+
+    // 计算 MA 均线
+    const ma = (period) => {
+      const result = [];
+      for (let i = 0; i < candles.length; i++) {
+        if (i < period - 1) { result.push(null); continue; }
+        let sum = 0;
+        for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
+        result.push(sum / period);
+      }
+      return result;
+    };
+
+    return {
+      name: json?.data?.name || "",
+      code: json?.data?.code || "",
+      candles,
+      ma5: ma(5),
+      ma10: ma(10),
+      ma20: ma(20),
+    };
+  } catch (e) {
+    console.error("[行情助手] K线数据获取失败:", e);
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 15. 大盘指数数据
+// ════════════════════════════════════════════════════════════
+async function fetchMarketIndices() {
+  // 主要指数 secids
+  const indices = [
+    { secid: "1.000001", name: "上证指数", code: "000001" },
+    { secid: "0.399001", name: "深证成指", code: "399001" },
+    { secid: "0.399006", name: "创业板指", code: "399006" },
+    { secid: "0.399005", name: "中小板指", code: "399005" },
+    { secid: "1.000688", name: "科创50", code: "000688" },
+    { secid: "116.HSI", name: "恒生指数", code: "HSI" },
+    { secid: "100.NDX", name: "纳斯达克", code: "NDX" },
+    { secid: "100.DJIA", name: "道琼斯", code: "DJIA" },
+  ];
+
+  const secidsParam = indices.map((i) => "secids=" + i.secid).join("&");
+  const url =
+    "https://push2.eastmoney.com/api/qt/ulist.np/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&" +
+    "fields=f2,f3,f4,f12,f14,f104,f105,f6&" + secidsParam;
+
+  try {
+    const json = await fetchWithHeaders(url);
+    const diff = json?.data?.diff ?? [];
+    const results = [];
+    for (const idx of indices) {
+      const d = diff.find((x) => x.f12 === idx.code) || diff.find((x) => (x.f14 || "").includes(idx.name.slice(0, 2)));
+      if (d) {
+        results.push({
+          ...idx,
+          price: d.f2,
+          pct: d.f3,
+          change: d.f4,
+          upCount: d.f104,
+          downCount: d.f105,
+          amount: d.f6,
+        });
+      } else {
+        // 尝试腾讯 fallback
+        const tcData = await fetchQuoteTencent(idx.secid);
+        if (tcData) {
+          results.push({
+            ...idx,
+            price: tcData.f43,
+            pct: tcData.f170,
+            change: tcData.f169,
+            upCount: 0,
+            downCount: 0,
+            amount: tcData.f48,
+          });
+        }
+      }
+    }
+    return results;
+  } catch (e) {
+    console.error("[行情助手] 指数数据获取失败:", e);
+    // fallback：逐个用腾讯接口获取
+    const results = [];
+    for (const idx of indices) {
+      const tcData = await fetchQuoteTencent(idx.secid);
+      if (tcData) {
+        results.push({
+          ...idx,
+          price: tcData.f43,
+          pct: tcData.f170,
+          change: tcData.f169,
+          upCount: 0,
+          downCount: 0,
+          amount: tcData.f48,
+        });
+      }
+    }
+    return results;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 16. 板块数据（行业板块涨跌排行 → 热力图）
+// ════════════════════════════════════════════════════════════
+async function fetchSectorData() {
+  // 行业板块排行
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1&invt=2" +
+    "&fid=f3&po=1&pz=50&pn=1" +
+    "&fs=m:90+t:2" +   // 行业板块
+    "&fields=f2,f3,f4,f8,f12,f14,f104,f105,f128,f140,f141";
+
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const diff = json?.data?.diff ?? [];
+    const items = Array.isArray(diff) ? diff : Object.values(diff);
+
+    return items.map((i) => ({
+      code: i.f12,
+      name: i.f14,
+      pct: i.f3,
+      change: i.f4,
+      turnover: i.f8,
+      upCount: i.f104,
+      downCount: i.f105,
+      leader: i.f140,
+      leaderPct: i.f141,
+    }));
+  } catch (e) {
+    console.error("[行情助手] 板块数据获取失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 17. 涨跌停统计 / 市场情绪
+// ════════════════════════════════════════════════════════════
+async function fetchMarketSentiment() {
+  // 涨停 / 跌停 / 涨跌家数
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+    "&fid=f3&po=1&pz=1&pn=1" +
+    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+    "&fields=f2,f3,f4,f12,f14";
+
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    const total = json?.data?.total ?? 0;
+
+    // 获取涨家数 / 跌家数 / 平家数
+    // 使用 f3 排序获取涨跌分布
+    const upUrl =
+      "https://push2.eastmoney.com/api/qt/clist/get?" +
+      "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+      "&fid=f3&po=1&pz=5000&pn=1" +
+      "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+      "&fields=f3,f6";
+
+    const upResp = await fetch(upUrl, { headers: EM_HEADERS });
+    const upJson = await upResp.json();
+    const allDiff = upJson?.data?.diff ?? [];
+    const allItems = Array.isArray(allDiff) ? allDiff : Object.values(allDiff);
+
+    let up = 0, down = 0, flat = 0;
+    let limitUp = 0, limitDown = 0;
+    for (const item of allItems) {
+      const pct = item.f3;
+      if (pct > 0) {
+        up++;
+        if (pct >= 9.9) limitUp++;
+      } else if (pct < 0) {
+        down++;
+        if (pct <= -9.9) limitDown++;
+      } else {
+        flat++;
+      }
+    }
+
+    return { total, up, down, flat, limitUp, limitDown };
+  } catch (e) {
+    console.error("[行情助手] 市场情绪获取失败:", e);
+    return { total: 0, up: 0, down: 0, flat: 0, limitUp: 0, limitDown: 0 };
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 // 9. 消息路由中心
 // ════════════════════════════════════════════════════════════
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -758,6 +985,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case "getPosition": {
         const pos = await getPosition(request.secid);
         return { success: true, data: pos };
+      }
+
+      // ── K线数据（Dashboard 使用）──
+      case "getKline": {
+        const kline = await fetchKlineData(request.secid, request.count || 120);
+        if (!kline) return { success: false, error: "无K线数据" };
+        return { success: true, data: kline };
+      }
+
+      // ── 大盘指数（Dashboard 使用）──
+      case "getMarketIndices": {
+        const indices = await fetchMarketIndices();
+        return { success: true, data: indices };
+      }
+
+      // ── 板块数据（Dashboard 热力图）──
+      case "getSectorData": {
+        const sectors = await fetchSectorData();
+        return { success: true, data: sectors };
+      }
+
+      // ── 市场情绪（涨跌停统计）──
+      case "getMarketSentiment": {
+        const sentiment = await fetchMarketSentiment();
+        return { success: true, data: sentiment };
       }
 
       default:

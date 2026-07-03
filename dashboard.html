@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投资工作台 — 选股行情助手</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo">📈</span>
+      <span class="topbar-title">投资工作台</span>
+      <span class="topbar-sub">选股行情助手 v5.0</span>
+    </div>
+    <div class="topbar-center">
+      <input type="text" id="globalSearch" placeholder="搜索股票名称或代码…" autocomplete="off">
+      <div id="searchDropdown" class="search-dropdown"></div>
+    </div>
+    <div class="topbar-right">
+      <button id="refreshAll" class="btn-icon" title="刷新全部">⟳</button>
+      <span id="updateTime" class="update-time"></span>
+    </div>
+  </header>
+
+  <!-- 大盘指数条 -->
+  <div id="indexBar" class="index-bar">
+    <div class="index-loading">加载指数中…</div>
+  </div>
+
+  <!-- 市场情绪条 -->
+  <div id="sentimentBar" class="sentiment-bar" style="display:none">
+    <div class="sentiment-item">
+      <span class="sentiment-num up" id="sentUp">0</span>
+      <span class="sentiment-label">上涨</span>
+    </div>
+    <div class="sentiment-item">
+      <span class="sentiment-num down" id="sentDown">0</span>
+      <span class="sentiment-label">下跌</span>
+    </div>
+    <div class="sentiment-item">
+      <span class="sentiment-num" id="sentFlat">0</span>
+      <span class="sentiment-label">平盘</span>
+    </div>
+    <div class="sentiment-divider"></div>
+    <div class="sentiment-item">
+      <span class="sentiment-num up" id="sentLimitUp">0</span>
+      <span class="sentiment-label">涨停</span>
+    </div>
+    <div class="sentiment-item">
+      <span class="sentiment-num down" id="sentLimitDown">0</span>
+      <span class="sentiment-label">跌停</span>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <main class="main-grid">
+    <!-- 左列：K线图 + 分时图 -->
+    <section class="col-left">
+      <div class="card chart-card">
+        <div class="card-header">
+          <h3 id="klineTitle">日K线</h3>
+          <div class="kline-tabs">
+            <button class="kltab active" data-period="101">日K</button>
+            <button class="kltab" data-period="102">周K</button>
+            <button class="kltab" data-period="103">月K</button>
+          </div>
+        </div>
+        <canvas id="klineCanvas"></canvas>
+        <div id="klineInfo" class="kline-info"></div>
+      </div>
+    </section>
+
+    <!-- 中列：板块热力图 + 自选股 -->
+    <section class="col-center">
+      <div class="card sector-card">
+        <div class="card-header">
+          <h3>🔥 行业板块热力图</h3>
+          <span class="card-sub" id="sectorTime"></span>
+        </div>
+        <div id="sectorHeatmap" class="sector-heatmap"></div>
+      </div>
+
+      <div class="card watchlist-card">
+        <div class="card-header">
+          <h3>⭐ 我的自选股</h3>
+          <span class="card-sub" id="watchlistCount2"></span>
+        </div>
+        <div id="watchlistGrid" class="watchlist-grid"></div>
+      </div>
+    </section>
+
+    <!-- 右列：持仓盈亏 + 预警 -->
+    <section class="col-right">
+      <div class="card portfolio-card">
+        <div class="card-header">
+          <h3>💼 持仓盈亏</h3>
+        </div>
+        <div id="portfolioSummary" class="portfolio-summary"></div>
+        <div id="portfolioDetail" class="portfolio-detail"></div>
+      </div>
+
+      <div class="card alert-card">
+        <div class="card-header">
+          <h3>🔔 价格预警</h3>
+        </div>
+        <div id="alertList" class="alert-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 股票详情侧栏（点击自选股/持仓时展开） -->
+  <div id="detailPanel" class="detail-panel" style="display:none">
+    <div class="detail-header">
+      <div>
+        <span id="detailName" class="detail-name"></span>
+        <span id="detailCode" class="detail-code"></span>
+      </div>
+      <button id="detailClose" class="btn-icon">✕</button>
+    </div>
+    <div id="detailPrice" class="detail-price"></div>
+    <div id="detailChange" class="detail-change"></div>
+    <div class="detail-stats">
+      <div class="stat-item"><span class="stat-label">今开</span><span id="detailOpen" class="stat-val"></span></div>
+      <div class="stat-item"><span class="stat-label">最高</span><span id="detailHigh" class="stat-val up"></span></div>
+      <div class="stat-item"><span class="stat-label">最低</span><span id="detailLow" class="stat-val down"></span></div>
+      <div class="stat-item"><span class="stat-label">昨收</span><span id="detailPreClose" class="stat-val"></span></div>
+      <div class="stat-item"><span class="stat-label">成交量</span><span id="detailVolume" class="stat-val"></span></div>
+      <div class="stat-item"><span class="stat-label">成交额</span><span id="detailAmount" class="stat-val"></span></div>
+      <div class="stat-item"><span class="stat-label">振幅</span><span id="detailAmplitude" class="stat-val"></span></div>
+      <div class="stat-item"><span class="stat-label">涨跌</span><span id="detailChg" class="stat-val"></span></div>
+    </div>
+    <div class="detail-section">
+      <h4>📈 分时走势</h4>
+      <canvas id="trendCanvas"></canvas>
+    </div>
+    <div class="detail-section">
+      <h4>💰 资金流向</h4>
+      <div id="detailFundFlow" class="fund-flow"></div>
+    </div>
+    <div class="detail-section">
+      <h4>📋 相关个股</h4>
+      <div id="detailRelated" class="related-stocks"></div>
+    </div>
+    <div class="detail-section">
+      <h4>📢 最新公告</h4>
+      <div id="detailAnnouncements" class="announcements"></div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
