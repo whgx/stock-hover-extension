@@ -113,6 +113,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("openDashboard")?.addEventListener("click", openDash);
   document.getElementById("openDashboardFooter")?.addEventListener("click", openDash);
 
+  // 打开侧边栏
+  document.getElementById("openSidePanel")?.addEventListener("click", () => {
+    chrome.sidePanel?.open({}).catch(() => {});
+    window.close();
+  });
+
   // 初始加载
   loadWatchlist();
   loadAllCounts();

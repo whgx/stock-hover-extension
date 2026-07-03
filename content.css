@@ -89,6 +89,13 @@
   filter: hue-rotate(0deg);
 }
 
+#stock-quote-card .sqc-expand {
+  opacity: 0.45;
+}
+#stock-quote-card .sqc-expand:hover {
+  opacity: 1;
+}
+
 #stock-quote-card .sqc-close {
   font-size: 18px;
   color: #bbb;

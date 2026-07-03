@@ -70,6 +70,7 @@
         <span class="sqc-name"></span>
         <span class="sqc-code"></span>
         <span class="sqc-pin sqc-icon-btn" title="固定（固定后不自动消失）">📌</span>
+        <span class="sqc-expand sqc-icon-btn" title="在工作台中打开">⛶</span>
         <span class="sqc-star sqc-icon-btn" title="加入自选">☆</span>
         <span class="sqc-bell sqc-icon-btn" title="价格预警">🔔</span>
         <span class="sqc-portfolio sqc-icon-btn" title="持仓">💼</span>
@@ -141,6 +142,11 @@
     el.querySelector(".sqc-pin").addEventListener("click", (e) => {
       e.stopPropagation();
       togglePin();
+    });
+    const expandBtn = el.querySelector(".sqc-expand");
+    if (expandBtn) expandBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      expandToDashboard();
     });
     el.querySelector(".sqc-star").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -215,6 +221,17 @@
   }
 
   // ── 固定/取消固定 ──────────────────────────────────
+  function expandToDashboard() {
+    const params = new URLSearchParams();
+    if (currentData) {
+      if (currentData.secid) params.set("secid", currentData.secid);
+      if (currentData.name) params.set("name", currentData.name);
+      if (currentData.code) params.set("code", currentData.code);
+    }
+    const url = chrome.runtime.getURL("dashboard.html" + (params.toString() ? "?" + params.toString() : ""));
+    chrome.tabs.create({ url });
+  }
+
   function togglePin() {
     pinned = !pinned;
     const pinBtn = card.querySelector(".sqc-pin");

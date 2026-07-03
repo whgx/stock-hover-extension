@@ -3,205 +3,379 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>投资工作台 — 选股行情助手</title>
+  <title>投资工作台 PRO — 选股行情助手</title>
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <!-- 顶栏 -->
-  <header class="topbar">
-    <div class="topbar-left">
-      <span class="logo">📈</span>
-      <span class="topbar-title">投资工作台</span>
-      <span class="topbar-sub">v6.0</span>
-    </div>
-    <div class="topbar-center">
-      <input type="text" id="globalSearch" placeholder="搜索股票名称或代码…" autocomplete="off">
-      <div id="searchDropdown" class="search-dropdown"></div>
-    </div>
-    <div class="topbar-right">
-      <button id="btnHeatmap" class="topbar-btn" title="板块热力图">🔥</button>
-      <button id="btnDragon" class="topbar-btn" title="龙虎榜">🐉</button>
-      <button id="btnSettings" class="topbar-btn" title="设置">⚙️</button>
-      <button id="refreshAll" class="btn-icon" title="刷新全部">⟳</button>
-      <span id="updateTime" class="update-time"></span>
-    </div>
-  </header>
+  <div class="app-layout">
+    <!-- ═══ 左侧导航栏 ═══ -->
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <span class="logo-icon">📈</span>
+        <div class="sidebar-title-group">
+          <span class="sidebar-title">投资工作台</span>
+          <span class="sidebar-version">v8.0 PRO</span>
+        </div>
+      </div>
 
-  <!-- 行情滚动条 -->
-  <div id="tickerBar" class="ticker-bar">
-    <div id="tickerTrack" class="ticker-track"></div>
-  </div>
+      <div class="sidebar-search">
+        <input type="text" id="globalSearch" placeholder="搜索股票名称或代码…" autocomplete="off">
+        <div id="searchDropdown" class="search-dropdown"></div>
+      </div>
 
-  <!-- 大盘指数条 -->
-  <div id="indexBar" class="index-bar">
-    <div class="index-loading">加载指数中…</div>
-  </div>
+      <div class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-label">行情</div>
+          <button class="nav-item active" data-view="overview">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">大盘总览</span>
+          </button>
+          <button class="nav-item" data-view="watchlist">
+            <span class="nav-icon">⭐</span>
+            <span class="nav-label">自选股看板</span>
+          </button>
+        </div>
 
-  <!-- 市场情绪条 -->
-  <div id="sentimentBar" class="sentiment-bar" style="display:none">
-    <div class="sentiment-item">
-      <span class="sentiment-num up" id="sentUp">0</span>
-      <span class="sentiment-label">上涨</span>
-    </div>
-    <div class="sentiment-item">
-      <span class="sentiment-num down" id="sentDown">0</span>
-      <span class="sentiment-label">下跌</span>
-    </div>
-    <div class="sentiment-item">
-      <span class="sentiment-num" id="sentFlat">0</span>
-      <span class="sentiment-label">平盘</span>
-    </div>
-    <div class="sentiment-divider"></div>
-    <div class="sentiment-item">
-      <span class="sentiment-num up" id="sentLimitUp">0</span>
-      <span class="sentiment-label">涨停</span>
-    </div>
-    <div class="sentiment-item">
-      <span class="sentiment-num down" id="sentLimitDown">0</span>
-      <span class="sentiment-label">跌停</span>
-    </div>
-    <div class="sentiment-divider"></div>
-    <button class="sentiment-item sentiment-btn" id="btnLimitUp">📈 涨停板</button>
-    <button class="sentiment-item sentiment-btn" id="btnLimitDown">📉 跌停板</button>
-    <button class="sentiment-item sentiment-btn" id="btnGainers">🔥 涨幅榜</button>
-    <button class="sentiment-item sentiment-btn" id="btnLosers">❄️ 跌幅榜</button>
-  </div>
+        <div class="nav-section">
+          <div class="nav-section-label">交易</div>
+          <button class="nav-item" data-view="portfolio">
+            <span class="nav-icon">💼</span>
+            <span class="nav-label">持仓分析</span>
+          </button>
+          <button class="nav-item" data-view="alerts">
+            <span class="nav-icon">🔔</span>
+            <span class="nav-label">价格预警</span>
+          </button>
+        </div>
 
-  <!-- Tab 切换区 -->
-  <div class="dashboard-tabs">
-    <button class="dtab active" data-view="overview">📊 总览</button>
-    <button class="dtab" data-view="portfolio">💼 持仓分析</button>
-    <button class="dtab" data-view="market">🏪 市场异动</button>
-  </div>
+        <div class="nav-section">
+          <div class="nav-section-label">市场</div>
+          <button class="nav-item" data-view="market">
+            <span class="nav-icon">🏪</span>
+            <span class="nav-label">市场异动</span>
+          </button>
+          <button class="nav-item" data-view="screener">
+            <span class="nav-icon">🔍</span>
+            <span class="nav-label">条件选股</span>
+            <span class="nav-badge new">NEW</span>
+          </button>
+        </div>
+      </div>
 
-  <!-- ═══ 总览视图 ═══ -->
-  <main id="viewOverview" class="main-grid">
-    <!-- 左列：K线图 -->
-    <section class="col-left">
-      <div class="card chart-card">
-        <div class="card-header">
-          <h3 id="klineTitle">日K线</h3>
-          <div class="kline-tabs">
-            <button class="kltab active" data-period="101">日K</button>
-            <button class="kltab" data-period="102">周K</button>
-            <button class="kltab" data-period="103">月K</button>
+      <div class="sidebar-footer">
+        <button class="nav-item" id="navSettings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">设置</span>
+        </button>
+        <div class="sidebar-clock" id="sidebarClock"></div>
+      </div>
+    </nav>
+
+    <!-- ═══ 右侧主区域 ═══ -->
+    <div class="main-area">
+      <!-- 顶栏 -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="pageTitle">大盘总览</h1>
+        </div>
+        <div class="topbar-right">
+          <button id="btnHeatmap" class="topbar-btn" title="板块热力图">🔥</button>
+          <button id="btnDragon" class="topbar-btn" title="龙虎榜">🐉</button>
+          <button id="refreshAll" class="btn-icon" title="刷新全部">⟳</button>
+          <span id="updateTime" class="update-time"></span>
+        </div>
+      </header>
+
+      <!-- 行情滚动条 -->
+      <div id="tickerBar" class="ticker-bar">
+        <div id="tickerTrack" class="ticker-track"></div>
+      </div>
+
+      <!-- 大盘指数条 -->
+      <div id="indexBar" class="index-bar">
+        <div class="index-loading">加载指数中…</div>
+      </div>
+
+      <!-- 市场情绪条 -->
+      <div id="sentimentBar" class="sentiment-bar" style="display:none">
+        <div class="sentiment-item">
+          <span class="sentiment-num up" id="sentUp">0</span>
+          <span class="sentiment-label">上涨</span>
+        </div>
+        <div class="sentiment-item">
+          <span class="sentiment-num down" id="sentDown">0</span>
+          <span class="sentiment-label">下跌</span>
+        </div>
+        <div class="sentiment-item">
+          <span class="sentiment-num" id="sentFlat">0</span>
+          <span class="sentiment-label">平盘</span>
+        </div>
+        <div class="sentiment-divider"></div>
+        <div class="sentiment-item">
+          <span class="sentiment-num up" id="sentLimitUp">0</span>
+          <span class="sentiment-label">涨停</span>
+        </div>
+        <div class="sentiment-item">
+          <span class="sentiment-num down" id="sentLimitDown">0</span>
+          <span class="sentiment-label">跌停</span>
+        </div>
+        <div class="sentiment-divider"></div>
+        <button class="sentiment-item sentiment-btn" id="btnLimitUp">📈 涨停板</button>
+        <button class="sentiment-item sentiment-btn" id="btnLimitDown">📉 跌停板</button>
+        <button class="sentiment-item sentiment-btn" id="btnGainers">🔥 涨幅榜</button>
+        <button class="sentiment-item sentiment-btn" id="btnLosers">❄️ 跌幅榜</button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════
+           视图区域
+           ═══════════════════════════════════════════════════ -->
+
+      <!-- 大盘总览视图 -->
+      <main id="viewOverview" class="content-view active">
+        <div class="main-grid">
+          <!-- 左列：K线图 -->
+          <section class="col-chart">
+            <div class="card chart-card">
+              <div class="card-header">
+                <h3 id="klineTitle">日K线</h3>
+                <div class="kline-tabs">
+                  <button class="kltab active" data-period="101">日K</button>
+                  <button class="kltab" data-period="102">周K</button>
+                  <button class="kltab" data-period="103">月K</button>
+                </div>
+              </div>
+              <canvas id="klineCanvas"></canvas>
+              <canvas id="volCanvas"></canvas>
+              <div id="klineInfo" class="kline-info"></div>
+            </div>
+          </section>
+
+          <!-- 中列：板块热力图 + 自选股 -->
+          <section class="col-center">
+            <div class="card sector-card">
+              <div class="card-header">
+                <h3>🔥 行业板块热力图</h3>
+                <span class="card-sub" id="sectorTime"></span>
+              </div>
+              <div id="sectorHeatmap" class="sector-heatmap"></div>
+            </div>
+
+            <div class="card watchlist-card">
+              <div class="card-header">
+                <h3>⭐ 我的自选股</h3>
+                <span class="card-sub" id="watchlistCount2"></span>
+              </div>
+              <div id="watchlistGrid" class="watchlist-grid"></div>
+            </div>
+          </section>
+
+          <!-- 右列：市场情绪 + 持仓 + 预警 -->
+          <section class="col-right">
+            <div class="card">
+              <div class="card-header"><h3>📊 市场情绪</h3></div>
+              <div class="sentiment-stats" id="sentStats">
+                <div class="sent-stat-box flat"><div class="sent-stat-num">--</div><div class="sent-stat-label">加载中</div></div>
+                <div class="sent-stat-box flat"><div class="sent-stat-num">--</div><div class="sent-stat-label">加载中</div></div>
+                <div class="sent-stat-box flat"><div class="sent-stat-num">--</div><div class="sent-stat-label">加载中</div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>💼 持仓盈亏</h3></div>
+              <div id="portfolioSummary" class="portfolio-summary"></div>
+              <div id="portfolioDetail" class="portfolio-detail"></div>
+            </div>
+            <div class="card alert-card">
+              <div class="card-header"><h3>🔔 价格预警</h3></div>
+              <div id="alertList" class="alert-list"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- 自选股看板视图 -->
+      <main id="viewWatchlist" class="content-view">
+        <div class="single-col">
+          <div class="card">
+            <div class="card-header">
+              <h3>⭐ 自选股看板</h3>
+              <span class="card-sub" id="watchlistCountFull"></span>
+            </div>
+            <div id="watchlistFullGrid" class="watchlist-full-grid"></div>
           </div>
         </div>
-        <canvas id="klineCanvas"></canvas>
-        <div id="klineInfo" class="kline-info"></div>
-      </div>
-    </section>
+      </main>
 
-    <!-- 中列：板块热力图 + 自选股 -->
-    <section class="col-center">
-      <div class="card sector-card">
-        <div class="card-header">
-          <h3>🔥 行业板块热力图</h3>
-          <span class="card-sub" id="sectorTime"></span>
-        </div>
-        <div id="sectorHeatmap" class="sector-heatmap"></div>
-      </div>
-
-      <div class="card watchlist-card">
-        <div class="card-header">
-          <h3>⭐ 我的自选股</h3>
-          <span class="card-sub" id="watchlistCount2"></span>
-        </div>
-        <div id="watchlistGrid" class="watchlist-grid"></div>
-      </div>
-    </section>
-
-    <!-- 右列：持仓盈亏 + 预警 -->
-    <section class="col-right">
-      <div class="card portfolio-card">
-        <div class="card-header">
-          <h3>💼 持仓盈亏</h3>
-        </div>
-        <div id="portfolioSummary" class="portfolio-summary"></div>
-        <div id="portfolioDetail" class="portfolio-detail"></div>
-      </div>
-
-      <div class="card alert-card">
-        <div class="card-header">
-          <h3>🔔 价格预警</h3>
-        </div>
-        <div id="alertList" class="alert-list"></div>
-      </div>
-    </section>
-  </main>
-
-  <!-- ═══ 持仓分析视图 ═══ -->
-  <main id="viewPortfolio" class="main-grid" style="display:none">
-    <section class="col-wide">
-      <!-- 持仓概览 -->
-      <div class="card">
-        <div class="card-header"><h3>💼 持仓总览</h3></div>
-        <div class="portfolio-dashboard">
-          <div class="pd-summary" id="pdSummary"></div>
-          <div class="pd-pie-wrap">
-            <canvas id="pieCanvas" width="240" height="240"></canvas>
-            <div class="pd-pie-legend" id="pieLegend"></div>
+      <!-- 持仓分析视图 -->
+      <main id="viewPortfolio" class="content-view">
+        <div class="single-col">
+          <div class="card">
+            <div class="card-header"><h3>💼 持仓总览</h3></div>
+            <div class="portfolio-dashboard">
+              <div class="pd-summary" id="pdSummary"></div>
+              <div class="pd-pie-wrap">
+                <canvas id="pieCanvas" width="240" height="240"></canvas>
+                <div class="pd-pie-legend" id="pieLegend"></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>📊 个股盈亏贡献度</h3></div>
+            <div id="contributionBars" class="contribution-bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>📋 持仓明细</h3></div>
+            <table class="portfolio-table" id="portfolioTable">
+              <thead>
+                <tr>
+                  <th>名称/代码</th><th>数量</th><th>成本价</th><th>现价</th>
+                  <th>市值</th><th>成本</th><th>盈亏</th><th>盈亏%</th>
+                </tr>
+              </thead>
+              <tbody id="portfolioTableBody"></tbody>
+            </table>
           </div>
         </div>
-      </div>
-      <!-- 个股贡献度 -->
-      <div class="card">
-        <div class="card-header"><h3>📊 个股盈亏贡献度</h3></div>
-        <div id="contributionBars" class="contribution-bars"></div>
-      </div>
-      <!-- 持仓明细表 -->
-      <div class="card">
-        <div class="card-header"><h3>📋 持仓明细</h3></div>
-        <table class="portfolio-table" id="portfolioTable">
-          <thead>
-            <tr>
-              <th>名称/代码</th><th>数量</th><th>成本价</th><th>现价</th>
-              <th>市值</th><th>成本</th><th>盈亏</th><th>盈亏%</th>
-            </tr>
-          </thead>
-          <tbody id="portfolioTableBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+      </main>
 
-  <!-- ═══ 市场异动视图 ═══ -->
-  <main id="viewMarket" class="main-grid" style="display:none">
-    <section class="col-wide">
-      <!-- 龙虎榜 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🐉 龙虎榜（今日）</h3>
-          <span class="card-sub" id="dragonTime"></span>
-        </div>
-        <div id="dragonList" class="dragon-list"></div>
-      </div>
-      <!-- 涨停板 / 跌停板 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>📈 涨停板 / 📉 跌停板</h3>
-          <div class="inline-tabs">
-            <button class="iltab active" data-board="up">涨停</button>
-            <button class="iltab" data-board="down">跌停</button>
+      <!-- 价格预警视图 -->
+      <main id="viewAlerts" class="content-view">
+        <div class="single-col">
+          <div class="card">
+            <div class="card-header"><h3>🔔 价格预警管理</h3></div>
+            <div id="alertListFull" class="alert-list-full"></div>
           </div>
         </div>
-        <div id="limitBoardList" class="limit-board-list"></div>
-      </div>
-      <!-- 热门排行 -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🔥 热门排行</h3>
-          <div class="inline-tabs">
-            <button class="iltab2 active" data-rank="amount">成交额</button>
-            <button class="iltab2" data-rank="gainer">涨幅榜</button>
-            <button class="iltab2" data-rank="loser">跌幅榜</button>
-            <button class="iltab2" data-rank="turnover">换手率</button>
+      </main>
+
+      <!-- 市场异动视图 -->
+      <main id="viewMarket" class="content-view">
+        <div class="single-col">
+          <div class="card">
+            <div class="card-header">
+              <h3>🐉 龙虎榜（今日）</h3>
+              <span class="card-sub" id="dragonTime"></span>
+            </div>
+            <div id="dragonList" class="dragon-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>📈 涨停板 / 📉 跌停板</h3>
+              <div class="inline-tabs">
+                <button class="iltab active" data-board="up">涨停</button>
+                <button class="iltab" data-board="down">跌停</button>
+              </div>
+            </div>
+            <div id="limitBoardList" class="limit-board-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>🔥 热门排行</h3>
+              <div class="inline-tabs">
+                <button class="iltab2 active" data-rank="amount">成交额</button>
+                <button class="iltab2" data-rank="gainer">涨幅榜</button>
+                <button class="iltab2" data-rank="loser">跌幅榜</button>
+                <button class="iltab2" data-rank="turnover">换手率</button>
+              </div>
+            </div>
+            <div id="hotRankList" class="hot-rank-list"></div>
           </div>
         </div>
-        <div id="hotRankList" class="hot-rank-list"></div>
-      </div>
-    </section>
-  </main>
+      </main>
+
+      <!-- 条件选股视图 -->
+      <main id="viewScreener" class="content-view">
+        <div class="single-col">
+          <div class="card">
+            <div class="card-header"><h3>🔍 条件选股器</h3></div>
+            <div class="screener-panel">
+              <div class="screener-filters">
+                <div class="filter-group">
+                  <label>涨跌幅范围</label>
+                  <div class="filter-range">
+                    <select id="screenChgOp">
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                      <option value="between">区间</option>
+                    </select>
+                    <input type="number" id="screenChgVal1" placeholder="数值" step="0.1" style="width:70px">
+                    <input type="number" id="screenChgVal2" placeholder="上限" step="0.1" style="width:70px;display:none">
+                    <span class="filter-unit">%</span>
+                  </div>
+                </div>
+                <div class="filter-group">
+                  <label>市盈率(PE)</label>
+                  <div class="filter-range">
+                    <select id="screenPeOp">
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                      <option value="between">区间</option>
+                    </select>
+                    <input type="number" id="screenPeVal1" placeholder="数值" step="0.1" style="width:70px">
+                    <input type="number" id="screenPeVal2" placeholder="上限" step="0.1" style="width:70px;display:none">
+                  </div>
+                </div>
+                <div class="filter-group">
+                  <label>市净率(PB)</label>
+                  <div class="filter-range">
+                    <select id="screenPbOp">
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                      <option value="between">区间</option>
+                    </select>
+                    <input type="number" id="screenPbVal1" placeholder="数值" step="0.1" style="width:70px">
+                    <input type="number" id="screenPbVal2" placeholder="上限" step="0.1" style="width:70px;display:none">
+                  </div>
+                </div>
+                <div class="filter-group">
+                  <label>成交额 ≥</label>
+                  <div class="filter-range">
+                    <select id="screenAmtUnit">
+                      <option value="1e8">1亿</option>
+                      <option value="5e8">5亿</option>
+                      <option value="1e9">10亿</option>
+                      <option value="5e9">50亿</option>
+                      <option value="1e10">100亿</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="filter-group">
+                  <label>换手率</label>
+                  <div class="filter-range">
+                    <select id="screenTurnOp">
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                    </select>
+                    <input type="number" id="screenTurnVal" placeholder="数值" step="0.1" style="width:70px">
+                    <span class="filter-unit">%</span>
+                  </div>
+                </div>
+                <div class="filter-group">
+                  <label>排序方式</label>
+                  <select id="screenSort" style="width:120px">
+                    <option value="f3">按涨跌幅</option>
+                    <option value="f6">按成交额</option>
+                    <option value="f8">按换手率</option>
+                    <option value="f12">按代码</option>
+                  </select>
+                </div>
+                <div class="filter-actions">
+                  <button class="btn-screener-run" id="btnScreenRun">🔍 开始筛选</button>
+                  <button class="btn-screener-reset" id="btnScreenReset">重置</button>
+                </div>
+              </div>
+              <div class="screener-stats" id="screenStats"></div>
+            </div>
+            <div id="screenResults" class="screener-results">
+              <div class="empty-state">
+                <div class="empty-state-icon">🔍</div>
+                <div>设置筛选条件后点击「开始筛选」</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
 
   <!-- 股票详情侧栏 -->
   <div id="detailPanel" class="detail-panel" style="display:none">
@@ -224,7 +398,6 @@
       <div class="stat-item"><span class="stat-label">振幅</span><span id="detailAmplitude" class="stat-val"></span></div>
       <div class="stat-item"><span class="stat-label">涨跌</span><span id="detailChg" class="stat-val"></span></div>
     </div>
-    <!-- 财务指标 -->
     <div class="detail-section">
       <h4>📊 核心财务指标</h4>
       <div id="detailFinance" class="finance-grid"></div>

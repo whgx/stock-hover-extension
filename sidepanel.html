@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>选股行情助手 — 侧边栏</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0e14;
+      --panel: #131720;
+      --panel-2: #1a1f2e;
+      --hover: #222938;
+      --border: #1e2433;
+      --border-2: #2a3040;
+      --text: #c8ced8;
+      --text-2: #8b95a8;
+      --text-3: #5a6378;
+      --red: #ff4d4f;
+      --green: #00d68f;
+      --blue: #3b82f6;
+      --font-mono: "SF Mono", "DIN Alternate", monospace;
+    }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      overflow-x: hidden;
+    }
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-bottom: 1px solid var(--border-2);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .header h1 { font-size: 13px; font-weight: 600; }
+    .header-btn {
+      background: var(--panel); border: 1px solid var(--border-2);
+      border-radius: 3px; padding: 3px 8px; cursor: pointer;
+      font-size: 11px; color: var(--text-2); transition: all 0.12s;
+    }
+    .header-btn:hover { background: var(--hover); color: var(--text); }
+    .tabs {
+      display: flex; border-bottom: 1px solid var(--border-2);
+      background: var(--panel);
+    }
+    .stab {
+      flex: 1; padding: 8px; border: none; background: none;
+      cursor: pointer; font-size: 11px; color: var(--text-2);
+      border-bottom: 2px solid transparent; transition: all 0.12s;
+    }
+    .stab:hover { color: var(--text); }
+    .stab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+    .stab .badge {
+      display: inline-block; min-width: 16px; height: 14px;
+      line-height: 14px; border-radius: 7px; font-size: 9px;
+      background: var(--red); color: #fff; text-align: center;
+      margin-left: 3px; padding: 0 3px;
+    }
+    .content { padding: 4px 0; }
+    .stock-row {
+      display: grid; grid-template-columns: 1fr 60px 60px;
+      align-items: center; gap: 4px; padding: 6px 12px;
+      border-bottom: 1px solid var(--border); cursor: pointer;
+      transition: background 0.1s;
+    }
+    .stock-row:hover { background: var(--hover); }
+    .stock-name { font-weight: 600; font-size: 12px; }
+    .stock-code { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
+    .stock-price { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: 12px; }
+    .stock-pct { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: 11px; }
+    .up { color: var(--red); }
+    .down { color: var(--green); }
+    .empty { padding: 40px 20px; text-align: center; color: var(--text-3); }
+    .empty-icon { font-size: 28px; margin-bottom: 6px; }
+    .summary {
+      padding: 10px 12px; background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-row {
+      display: flex; justify-content: space-between;
+      padding: 2px 0; font-size: 11px;
+    }
+    .summary-label { color: var(--text-2); }
+    .summary-val { font-family: var(--font-mono); font-weight: 600; }
+    .clock-bar {
+      padding: 4px 12px; text-align: center;
+      font-size: 10px; color: var(--text-3); font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border);
+    }
+    .market-status { display: inline-block; margin-left: 6px; }
+    .market-status.open { color: var(--red); }
+    .market-status.closed { color: var(--text-3); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📈 实时行情</h1>
+    <button class="header-btn" id="btnOpenDash">工作台</button>
+  </div>
+  <div class="clock-bar" id="clockBar"></div>
+  <div class="tabs">
+    <button class="stab active" data-tab="watch">自选股 <span class="badge" id="watchBadge" style="display:none">0</span></button>
+    <button class="stab" data-tab="portfolio">持仓</button>
+    <button class="stab" data-tab="index">指数</button>
+  </div>
+  <div class="content" id="content"></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

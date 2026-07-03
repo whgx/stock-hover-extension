@@ -268,7 +268,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ════════════════════════════════════════════════════════════
 // 6. 快捷键 (Alt+S)
 // ════════════════════════════════════════════════════════════
-chrome.commands.onCommand.addListener((command) => {
+chrome.commands.onCommand.addListener(async (command) => {
   if (command === "search-stock") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
@@ -277,6 +277,11 @@ chrome.commands.onCommand.addListener((command) => {
     });
   } else if (command === "open-dashboard") {
     chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  } else if (command === "open-side-panel") {
+    try {
+      const win = await chrome.windows.getCurrent();
+      chrome.sidePanel.open({ windowId: win.id }).catch(() => {});
+    } catch(e) {}
   }
 });
 
@@ -1008,7 +1013,92 @@ async function fetchHotStocks(rankType = "amount") {
 }
 
 // ════════════════════════════════════════════════════════════
-// 9. 消息路由中心
+// V8: 条件选股器
+// ════════════════════════════════════════════════════════════
+async function runStockScreener(conditions) {
+  const fid = conditions.sort || "f3";
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+    "&fid=" + fid + "&po=1&pz=200&pn=1" +
+    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+    "&fields=f2,f3,f6,f8,f9,f12,f14,f15,f16,f23,f84,f85,f100,f115,f128";
+
+  try {
+    const resp = await fetch(url, { headers: EM_HEADERS });
+    const json = await resp.json();
+    let diff = json?.data?.diff ?? [];
+    let items = Array.isArray(diff) ? diff : Object.values(diff);
+
+    // 客户端过滤
+    items = items.filter((i) => {
+      if (i.f2 == null || i.f2 < 0) return false; // 排除无价格/停牌
+
+      // 涨跌幅过滤
+      if (conditions.chg) {
+        const pct = i.f3 ?? 0;
+        const c = conditions.chg;
+        if (c.op === "gte" && pct < c.v1) return false;
+        if (c.op === "lte" && pct > c.v1) return false;
+        if (c.op === "between" && (pct < c.v1 || pct > (c.v2 || Infinity))) return false;
+      }
+
+      // PE 过滤
+      if (conditions.pe) {
+        const pe = i.f9 ?? -999;
+        if (pe < 0 && conditions.pe.v1 > 0) return false; // 亏损股默认排除
+        const c = conditions.pe;
+        if (c.op === "gte" && pe < c.v1) return false;
+        if (c.op === "lte" && pe > c.v1) return false;
+        if (c.op === "between" && (pe < c.v1 || pe > (c.v2 || Infinity))) return false;
+      }
+
+      // PB 过滤
+      if (conditions.pb) {
+        const pb = i.f23 ?? -999;
+        if (pb < 0 && conditions.pb.v1 > 0) return false;
+        const c = conditions.pb;
+        if (c.op === "gte" && pb < c.v1) return false;
+        if (c.op === "lte" && pb > c.v1) return false;
+        if (c.op === "between" && (pb < c.v1 || pb > (c.v2 || Infinity))) return false;
+      }
+
+      // 成交额过滤
+      if (conditions.amtMin && (i.f6 || 0) < conditions.amtMin) return false;
+
+      // 换手率过滤
+      if (conditions.turn) {
+        const turn = i.f8 ?? 0;
+        const c = conditions.turn;
+        if (c.op === "gte" && turn < c.val) return false;
+        if (c.op === "lte" && turn > c.val) return false;
+      }
+
+      return true;
+    });
+
+    // 取前 50 条
+    items = items.slice(0, 50);
+
+    return items.map((i) => ({
+      code: i.f12,
+      name: i.f14,
+      price: i.f2,
+      pct: i.f3,
+      amount: i.f6,
+      amountStr: i.f6 >= 1e8 ? (i.f6 / 1e8).toFixed(2) + "亿" : (i.f6 / 1e4).toFixed(0) + "万",
+      turnover: i.f8,
+      pe: i.f9 != null && i.f9 > 0 ? i.f9 : null,
+      pb: i.f23 != null && i.f23 > 0 ? i.f23 : null,
+    }));
+  } catch (e) {
+    console.error("[行情助手] 条件选股失败:", e);
+    return [];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// 22. 消息路由中心
 // ════════════════════════════════════════════════════════════
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const handler = async () => {
@@ -1208,6 +1298,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // ── 热门股票排行 ──
       case "getHotStocks": {
         const data = await fetchHotStocks(request.rankType || "amount");
+        return { success: true, data };
+      }
+
+      // ── V8: 条件选股器 ──
+      case "screener": {
+        const data = await runStockScreener(request.conditions || {});
         return { success: true, data };
       }
 

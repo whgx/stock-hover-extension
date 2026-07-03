@@ -1,6 +1,8 @@
 /**
- * dashboard.js (v5.0) — 全屏投资工作台
- * 功能：大盘指数 / 市场情绪 / 日K线图 / 板块热力图 / 自选股网格 / 持仓盈亏 / 预警 / 股票详情侧栏
+ * dashboard.js (v8.0 PRO) — 专业交易工作台
+ * 布局：左侧导航栏 + 右侧仪表盘
+ * 功能：大盘指数 / 市场情绪 / 日K线图+成交量 / 板块热力图 / 自选股看板 / 持仓盈亏 / 预警
+ *       持仓分析（饼图/贡献度/明细表）/ 市场异动（龙虎榜/涨跌停/热门排行）/ 条件选股器
  */
 
 // ═══ 全局状态 ═══
@@ -81,6 +83,21 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAlerts();
   loadTicker();
   loadKline(currentKlineSecid);
+  updateClock();
+
+  // 检查 URL 参数（从悬浮卡片跳转过来）
+  const params = new URLSearchParams(window.location.search);
+  const jumpSecid = params.get("secid");
+  const jumpName = params.get("name");
+  const jumpCode = params.get("code");
+  if (jumpSecid) {
+    currentKlineSecid = jumpSecid;
+    switchView("overview");
+    setTimeout(() => {
+      loadKline(jumpSecid, jumpName || "");
+      if (jumpCode) openDetail(jumpSecid, jumpName || "", jumpCode);
+    }, 300);
+  }
 
   // 全局搜索
   const inp = document.getElementById("globalSearch");
@@ -110,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (e.key === "Escape") hideDropdown();
   });
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".topbar-center")) hideDropdown();
+    if (!e.target.closest(".sidebar-search")) hideDropdown();
   });
 
   // 刷新按钮
@@ -120,6 +137,9 @@ document.addEventListener("DOMContentLoaded", () => {
     loadTicker(); loadKline(currentKlineSecid);
     if (currentView === "market") loadMarketData();
     if (currentView === "portfolio") loadPortfolioAnalysis();
+    if (currentView === "watchlist") loadWatchlistFull();
+    if (currentView === "alerts") loadAlertsFull();
+    if (currentView === "screener") {}
   });
 
   // K线周期切换
@@ -137,29 +157,32 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("detailPanel").style.display = "none";
   });
 
-  // ── V6: Tab 切换 ──
-  document.querySelectorAll(".dtab").forEach((tab) => {
-    tab.addEventListener("click", () => switchView(tab.dataset.view));
+  // ── 左侧导航栏切换 ──
+  document.querySelectorAll(".nav-item[data-view]").forEach((item) => {
+    item.addEventListener("click", () => switchView(item.dataset.view));
   });
 
-  // ── V6: 龙虎榜按钮 ──
-  const btnDragon = document.getElementById("btnDragon");
-  if (btnDragon) btnDragon.addEventListener("click", () => switchView("market"));
-
-  // ── V6: 热力图按钮 ──
-  const btnHeatmap = document.getElementById("btnHeatmap");
-  if (btnHeatmap) btnHeatmap.addEventListener("click", () => {
-    const el = document.getElementById("sectorHeatmap");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  });
-
-  // ── V6: 设置按钮 ──
-  const btnSettings = document.getElementById("btnSettings");
-  if (btnSettings) btnSettings.addEventListener("click", () => {
+  // ── 设置按钮 ──
+  const navSettings = document.getElementById("navSettings");
+  if (navSettings) navSettings.addEventListener("click", () => {
     chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
   });
 
-  // ── V6: 情绪条按钮 ──
+  // ── 龙虎榜按钮 ──
+  const btnDragon = document.getElementById("btnDragon");
+  if (btnDragon) btnDragon.addEventListener("click", () => switchView("market"));
+
+  // ── 热力图按钮 ──
+  const btnHeatmap = document.getElementById("btnHeatmap");
+  if (btnHeatmap) btnHeatmap.addEventListener("click", () => {
+    switchView("overview");
+    setTimeout(() => {
+      const el = document.getElementById("sectorHeatmap");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  });
+
+  // ── 情绪条按钮 ──
   const btnLimitUp = document.getElementById("btnLimitUp");
   if (btnLimitUp) btnLimitUp.addEventListener("click", () => {
     limitBoardType = "up";
@@ -185,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => loadHotRank(), 200);
   });
 
-  // ── V6: 涨跌停 Tab 切换 ──
+  // ── 涨跌停 Tab 切换 ──
   document.querySelectorAll(".iltab").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".iltab").forEach((t) => t.classList.remove("active"));
@@ -195,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // ── V6: 热门排行 Tab 切换 ──
+  // ── 热门排行 Tab 切换 ──
   document.querySelectorAll(".iltab2").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".iltab2").forEach((t) => t.classList.remove("active"));
@@ -205,8 +228,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // ── 条件选股器 ──
+  initScreener();
+
+  // ── 选股器操作符联动 ──
+  ["screenChgOp", "screenPeOp", "screenPbOp"].forEach((id) => {
+    const sel = document.getElementById(id);
+    if (sel) sel.addEventListener("change", () => {
+      const baseId = id.replace("Op", "");
+      const val2 = document.getElementById(baseId + "Val2");
+      if (val2) val2.style.display = sel.value === "between" ? "" : "none";
+    });
+  });
+
   // 定时刷新（盘中5秒，非盘中30秒）
   startAutoRefresh();
+  // 时钟每秒更新
+  setInterval(updateClock, 1000);
 });
 
 // ═══ 搜索 ═══
@@ -299,6 +337,38 @@ async function loadSentiment() {
   document.getElementById("sentFlat").textContent = d.flat || 0;
   document.getElementById("sentLimitUp").textContent = d.limitUp || 0;
   document.getElementById("sentLimitDown").textContent = d.limitDown || 0;
+  // 更新右侧面板情绪统计块
+  const sentStats = document.getElementById("sentStats");
+  if (sentStats) {
+    const total = (d.up || 0) + (d.down || 0) + (d.flat || 0);
+    const ratio = total > 0 ? Math.round((d.up / total) * 100) : 0;
+    sentStats.innerHTML = `
+      <div class="sent-stat-box up">
+        <div class="sent-stat-num up">${d.up || 0}</div>
+        <div class="sent-stat-label">上涨</div>
+      </div>
+      <div class="sent-stat-box down">
+        <div class="sent-stat-num down">${d.down || 0}</div>
+        <div class="sent-stat-label">下跌</div>
+      </div>
+      <div class="sent-stat-box flat">
+        <div class="sent-stat-num">${d.flat || 0}</div>
+        <div class="sent-stat-label">平盘</div>
+      </div>
+      <div class="sent-stat-box up">
+        <div class="sent-stat-num up">${d.limitUp || 0}</div>
+        <div class="sent-stat-label">涨停</div>
+      </div>
+      <div class="sent-stat-box down">
+        <div class="sent-stat-num down">${d.limitDown || 0}</div>
+        <div class="sent-stat-label">跌停</div>
+      </div>
+      <div class="sent-stat-box flat">
+        <div class="sent-stat-num">${ratio}%</div>
+        <div class="sent-stat-label">赚钱效应</div>
+      </div>
+    `;
+  }
 }
 
 // ═══ 板块热力图 ═══
@@ -351,10 +421,12 @@ async function loadWatchlist() {
     const c = cls(s.changePercent);
     return `
       <div class="watch-item" data-secid="${s.secid}" data-name="${s.name}" data-code="${s.code}">
-        <div class="watch-item-name">${s.name}</div>
+        <div class="watch-item-info">
+          <div class="watch-item-name">${s.name}</div>
+          <div class="watch-item-code">${s.code}</div>
+        </div>
         <div class="watch-item-price ${c}">${safe(s.price)}</div>
         <div class="watch-item-pct ${c}">${sign(s.changePercent)}${safe(s.changePercent)}%</div>
-        <div class="watch-item-code">${s.code}</div>
       </div>
     `;
   }).join("");
@@ -397,10 +469,16 @@ async function loadPortfolio() {
   const pcls = totalProfit >= 0 ? "up" : "down";
 
   summaryEl.innerHTML = `
-    <div class="pf-total-label">总盈亏</div>
-    <div class="pf-total-val ${pcls}">${sign(totalProfit)}${totalProfit.toFixed(2)}</div>
-    <div class="pf-total-pct ${pcls}">${sign(totalPct)}${totalPct.toFixed(2)}%</div>
-    <div class="pf-total-detail">市值 ${fmtAmt(totalMV)} · 成本 ${fmtAmt(totalCost)}</div>
+    <div class="pf-stat-box">
+      <div class="pf-total-label">总市值</div>
+      <div class="pf-total-val">${fmtMoney(totalMV)}</div>
+      <div class="pf-total-detail">成本 ${fmtMoney(totalCost)}</div>
+    </div>
+    <div class="pf-stat-box">
+      <div class="pf-total-label">总盈亏</div>
+      <div class="pf-total-val ${pcls}">${sign(totalProfit)}${fmtMoney(totalProfit)}</div>
+      <div class="pf-total-pct ${pcls}">${sign(totalPct)}${totalPct.toFixed(2)}%</div>
+    </div>
   `;
 
   detailEl.innerHTML = list.map((p) => {
@@ -482,16 +560,17 @@ async function loadKline(secid, name) {
   }
 
   drawKline(canvas, ctx, candles, data.ma5, data.ma10, data.ma20);
+  drawVolume(candles);
 
   const last = candles[candles.length - 1];
   infoEl.innerHTML = `
-    <span>日期: ${last.date}</span>
-    <span class="${cls(last.open - last.close)}">开: ${last.open.toFixed(2)}</span>
-    <span class="${cls(last.high - last.close)}">高: ${last.high.toFixed(2)}</span>
-    <span class="${cls(last.low - last.close)}">低: ${last.low.toFixed(2)}</span>
-    <span class="${cls(last.close - candles[candles.length - 2]?.close || last.open)}">收: ${last.close.toFixed(2)}</span>
+    <span style="color:var(--text-2)">日期 ${last.date}</span>
+    <span class="${cls(last.open - last.close)}">开 ${last.open.toFixed(2)}</span>
+    <span class="${cls(last.high - last.close)}">高 ${last.high.toFixed(2)}</span>
+    <span class="${cls(last.low - last.close)}">低 ${last.low.toFixed(2)}</span>
+    <span class="${cls(last.close - candles[candles.length - 2]?.close || last.open)}">收 ${last.close.toFixed(2)}</span>
     <span class="${cls(last.pct)}">${sign(last.pct)}${last.pct.toFixed(2)}%</span>
-    <span style="color:var(--text-sub)">量: ${fmtVol(last.volume)}</span>
+    <span style="color:var(--text-2)">量 ${fmtVol(last.volume)}</span>
   `;
 }
 
@@ -540,13 +619,15 @@ function drawKline(canvas, ctx, candles, ma5, ma10, ma20) {
   const xOf = (i) => padding.left + i * candleW + candleW / 2;
 
   // 横线
-  ctx.strokeStyle = "#f0f0f0";
+  const isDarkTheme = !document.body.classList.contains("light-mode");
+  ctx.strokeStyle = isDarkTheme ? "#1e2433" : "#e0e3e8";
   ctx.lineWidth = 1;
-  ctx.font = "10px sans-serif";
-  ctx.fillStyle = "#aaa";
+  ctx.font = "10px monospace";
+  ctx.fillStyle = isDarkTheme ? "#5a6378" : "#9aa0b0";
   ctx.textAlign = "left";
   for (let i = 0; i <= 4; i++) {
     const y = padding.top + (chartH / 4) * i;
+    ctx.setLineDash([2, 3]);
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(W - padding.right, y);
@@ -554,11 +635,10 @@ function drawKline(canvas, ctx, candles, ma5, ma10, ma20) {
     const price = pMax - ((pMax - pMin) / 4) * i;
     ctx.fillText(price.toFixed(2), W - padding.right + 4, y + 3);
   }
+  ctx.setLineDash([]);
 
-  // 绘制K线
-  const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const upColor = "#e8493e", downColor = "#00a870";
-  const upBg = isDark ? "#3a1a1a" : "#fff1f0", downBg = isDark ? "#1a3a1a" : "#f0fff5";
+  // 绘制K线 — 专业交易终端配色
+  const upColor = "#ff4d4f", downColor = "#00d68f";
 
   data.forEach((c, i) => {
     const x = xOf(i);
@@ -597,16 +677,63 @@ function drawKline(canvas, ctx, candles, ma5, ma10, ma20) {
     }
     ctx.stroke();
   };
-  drawMA(m5, "#f5a623");
-  drawMA(m10, "#1890ff");
-  drawMA(m20, "#9b59b6");
+  drawMA(m5, "#f0b429");
+  drawMA(m10, "#3b82f6");
+  drawMA(m20, "#8b5cf6");
 
   // 图例
-  ctx.font = "11px sans-serif";
+  ctx.font = "10px monospace";
   ctx.textAlign = "left";
-  ctx.fillStyle = "#f5a623"; ctx.fillText("MA5", 10, 14);
-  ctx.fillStyle = "#1890ff"; ctx.fillText("MA10", 45, 14);
-  ctx.fillStyle = "#9b59b6"; ctx.fillText("MA20", 85, 14);
+  ctx.fillStyle = "#f0b429"; ctx.fillText("MA5:" + (m5[m5.length-1] ? m5[m5.length-1].toFixed(2) : "--"), 10, 14);
+  ctx.fillStyle = "#3b82f6"; ctx.fillText("MA10:" + (m10[m10.length-1] ? m10[m10.length-1].toFixed(2) : "--"), 80, 14);
+  ctx.fillStyle = "#8b5cf6"; ctx.fillText("MA20:" + (m20[m20.length-1] ? m20[m20.length-1].toFixed(2) : "--"), 155, 14);
+}
+
+// ═══ 成交量柱状图 ═══
+function drawVolume(candles) {
+  const volCanvas = document.getElementById("volCanvas");
+  if (!volCanvas) return;
+  const ctx = volCanvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const W = volCanvas.clientWidth;
+  const H = volCanvas.clientHeight;
+  volCanvas.width = W * dpr;
+  volCanvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const showCount = Math.min(candles.length, 60);
+  const data = candles.slice(-showCount);
+  if (data.length === 0) return;
+
+  const padding = { top: 4, right: 50, bottom: 2, left: 8 };
+  const chartW = W - padding.left - padding.right;
+  const chartH = H - padding.top - padding.bottom;
+  const candleW = chartW / data.length;
+  const bodyW = Math.max(2, candleW * 0.6);
+
+  let vMax = 0;
+  data.forEach((c) => { vMax = Math.max(vMax, c.volume || 0); });
+  if (vMax === 0) return;
+
+  const upColor = "#ff4d4f", downColor = "#00d68f";
+
+  data.forEach((c, i) => {
+    const x = padding.left + i * candleW + candleW / 2;
+    const isUp = c.close >= c.open;
+    const color = isUp ? upColor : downColor;
+    const h = ((c.volume || 0) / vMax) * chartH;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(x - bodyW / 2, padding.top + chartH - h, bodyW, h);
+  });
+  ctx.globalAlpha = 1;
+
+  // 标注最大量
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#5a6378";
+  ctx.textAlign = "left";
+  ctx.fillText(fmtVol(vMax), W - padding.right + 4, padding.top + 6);
 }
 
 // ═══ 详情侧栏 ═══
@@ -693,8 +820,8 @@ function drawTrend(canvas, ctx, points, preClose) {
   const yOf = (p) => pad.top + cH - ((p - pMin) / (pMax - pMin)) * cH;
 
   // 昨收虚线
-  const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  ctx.strokeStyle = isDark ? "#444" : "#ddd";
+  const isDarkTheme = !document.body.classList.contains("light-mode");
+  ctx.strokeStyle = isDarkTheme ? "#2a3040" : "#d0d4dc";
   ctx.setLineDash([3, 3]);
   ctx.beginPath();
   const ypc = yOf(preClose);
@@ -706,7 +833,7 @@ function drawTrend(canvas, ctx, points, preClose) {
   // 填充区域
   const lastPrice = prices[prices.length - 1];
   const isUp = lastPrice >= preClose;
-  const lineColor = isUp ? "#e8493e" : "#00a870";
+  const lineColor = isUp ? "#ff4d4f" : "#00d68f";
 
   ctx.beginPath();
   ctx.moveTo(pad.left, yOf(prices[0]));
@@ -717,7 +844,7 @@ function drawTrend(canvas, ctx, points, preClose) {
   ctx.lineTo(pad.left, pad.top + cH);
   ctx.closePath();
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
-  grad.addColorStop(0, isUp ? "rgba(232,73,62,0.15)" : "rgba(0,168,112,0.15)");
+  grad.addColorStop(0, isUp ? "rgba(255,77,79,0.12)" : "rgba(0,214,143,0.12)");
   grad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = grad;
   ctx.fill();
@@ -885,18 +1012,34 @@ function guessSecid(code) {
   return "1." + code;
 }
 
-// ── Tab 切换 ──────────────────────────────────
+// ── 视图切换（左侧导航栏）──────────────────────────
 let currentView = "overview";
+const viewTitles = {
+  overview: "大盘总览",
+  watchlist: "自选股看板",
+  portfolio: "持仓分析",
+  alerts: "价格预警",
+  market: "市场异动",
+  screener: "条件选股",
+};
 function switchView(view) {
   currentView = view;
-  document.querySelectorAll(".dtab").forEach((t) => {
+  // 导航栏高亮
+  document.querySelectorAll(".nav-item[data-view]").forEach((t) => {
     t.classList.toggle("active", t.dataset.view === view);
   });
-  document.getElementById("viewOverview").style.display = view === "overview" ? "" : "none";
-  document.getElementById("viewPortfolio").style.display = view === "portfolio" ? "" : "none";
-  document.getElementById("viewMarket").style.display = view === "market" ? "" : "none";
+  // 视图显隐
+  document.querySelectorAll(".content-view").forEach((el) => {
+    el.classList.toggle("active", el.id === "view" + view.charAt(0).toUpperCase() + view.slice(1));
+  });
+  // 页面标题
+  const titleEl = document.getElementById("pageTitle");
+  if (titleEl) titleEl.textContent = viewTitles[view] || view;
+  // 懒加载
   if (view === "portfolio") loadPortfolioAnalysis();
   if (view === "market") loadMarketData();
+  if (view === "watchlist") loadWatchlistFull();
+  if (view === "alerts") loadAlertsFull();
 }
 
 // ── 龙虎榜 ──────────────────────────────────
@@ -916,11 +1059,12 @@ async function loadDragonTiger() {
     return `
       <div class="dragon-row" data-code="${s.code}" data-name="${s.name}">
         <span class="dragon-rank">${i + 1}</span>
-        <span class="dragon-name">${s.name}</span>
-        <span class="dragon-code">${s.code}</span>
-        <span class="dragon-price ${c}">${safe(s.price)}</span>
-        <span class="dragon-pct ${c}">${sign(s.pct)}${safe(s.pct)}%</span>
+        <div>
+          <span class="dragon-name">${s.name}</span>
+          <span class="dragon-code">${s.code}</span>
+        </div>
         <span class="dragon-net ${s.netBuy >= 0 ? "up" : "down"}">${s.netBuy >= 0 ? "+" : ""}${fmtAmt(s.netBuy)}</span>
+        <span class="${c}" style="font-family:var(--font-mono);text-align:right">${sign(s.pct)}${safe(s.pct)}%</span>
         <span class="dragon-reason">${s.reason || ""}</span>
       </div>
     `;
@@ -949,12 +1093,13 @@ async function loadLimitBoard() {
     return `
       <div class="limit-row" data-code="${s.code}" data-name="${s.name}">
         <span class="limit-rank">${i + 1}</span>
-        <span class="limit-name">${s.name}</span>
-        <span class="limit-code">${s.code}</span>
-        <span class="limit-price ${c}">${safe(s.price)}</span>
-        <span class="limit-pct ${c}">${sign(s.pct)}${safe(s.pct)}%</span>
-        <span class="limit-amount">${s.amountStr || fmtAmt(s.amount)}</span>
-        <span class="limit-turnover">${safe(s.turnover, 1)}%</span>
+        <div>
+          <span class="limit-name">${s.name}</span>
+          <span class="limit-code">${s.code}</span>
+        </div>
+        <span class="${c}" style="font-family:var(--font-mono);text-align:right">${safe(s.price)}</span>
+        <span class="${c}" style="font-family:var(--font-mono);text-align:right">${sign(s.pct)}${safe(s.pct)}%</span>
+        <span style="font-family:var(--font-mono);color:var(--text-2);text-align:right;font-size:11px">${s.amountStr || fmtAmt(s.amount)}</span>
       </div>
     `;
   }).join("");
@@ -982,12 +1127,13 @@ async function loadHotRank() {
     return `
       <div class="hot-row" data-code="${s.code}" data-name="${s.name}">
         <span class="hot-rank">${i + 1}</span>
-        <span class="hot-name">${s.name}</span>
-        <span class="hot-code">${s.code}</span>
-        <span class="hot-price ${c}">${safe(s.price)}</span>
-        <span class="hot-pct ${c}">${sign(s.pct)}${safe(s.pct)}%</span>
-        <span class="hot-amount">${s.amountStr || fmtAmt(s.amount)}</span>
-        <span class="hot-turnover">${safe(s.turnover, 1)}%</span>
+        <div>
+          <span class="hot-name">${s.name}</span>
+          <span class="hot-code">${s.code}</span>
+        </div>
+        <span class="${c}" style="font-family:var(--font-mono);text-align:right">${safe(s.price)}</span>
+        <span class="${c}" style="font-family:var(--font-mono);text-align:right">${sign(s.pct)}${safe(s.pct)}%</span>
+        <span style="font-family:var(--font-mono);color:var(--text-2);text-align:right;font-size:11px">${s.amountStr || fmtAmt(s.amount)}</span>
       </div>
     `;
   }).join("");
@@ -1228,7 +1374,7 @@ async function loadFinance(code) {
       <span class="fin-label">${it.label}</span>
       <span class="fin-value">${it.value != null ? safe(it.value, 2) + it.suffix : "—"}</span>
     </div>
-  `).join("") + (d.reportDate ? `<div style="grid-column:1/-1;text-align:right;color:#888;font-size:11px;padding:4px 0">报告期: ${d.reportDate}</div>` : "");
+  `).join("") + (d.reportDate ? `<div style="grid-column:1/-1;text-align:right;color:var(--text-2);font-size:10px;padding:4px 0;font-family:var(--font-mono)">报告期 ${d.reportDate}</div>` : "");
 }
 
 // ── 自动刷新（盘中 5 秒）──────────────────────────
@@ -1248,10 +1394,199 @@ function startAutoRefresh() {
 function isMarketOpen() {
   const now = new Date();
   const day = now.getDay();
-  if (day === 0 || day === 6) return false; // 周末
+  if (day === 0 || day === 6) return false;
   const h = now.getHours();
   const m = now.getMinutes();
   const t = h * 60 + m;
-  // 9:25-11:30 或 13:00-15:00
   return (t >= 565 && t <= 690) || (t >= 780 && t <= 900);
+}
+
+// ════════════════════════════════════════════════════════════
+// V8 新增功能
+// ════════════════════════════════════════════════════════════
+
+// ── 时钟 ──────────────────────────────────
+function updateClock() {
+  const el = document.getElementById("sidebarClock");
+  if (!el) return;
+  const now = new Date();
+  const time = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const date = now.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+  const isMarket = isMarketOpen();
+  el.innerHTML = `${date} ${time}${isMarket ? '<br><span style="color:var(--red)">● 交易中</span>' : ""}`;
+}
+
+// ── 自选股全屏视图 ──────────────────────────────────
+async function loadWatchlistFull() {
+  const container = document.getElementById("watchlistFullGrid");
+  const countEl = document.getElementById("watchlistCountFull");
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div>加载中…</div></div>';
+  const resp = await sendMsg({ action: "getWatchlistQuotes" });
+  if (!resp || !resp.success) {
+    container.innerHTML = '<div class="empty-state">加载失败</div>';
+    return;
+  }
+  const list = resp.data ?? [];
+  if (countEl) countEl.textContent = list.length + " 只";
+  if (list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⭐</div><div>暂无自选股，通过搜索框添加</div></div>';
+    return;
+  }
+  let html = '<div class="watch-full-header"><span>#</span><span>名称/代码</span><span>现价</span><span>涨跌</span><span>涨跌幅</span><span>成交额</span></div>';
+  html += list.map((s, i) => {
+    const c = cls(s.changePercent);
+    return `
+      <div class="watch-full-item" data-secid="${s.secid}" data-name="${s.name}" data-code="${s.code}">
+        <span class="watch-full-rank">${i + 1}</span>
+        <div><div class="watch-full-name">${s.name}</div><div class="watch-full-code">${s.code}</div></div>
+        <span class="watch-full-price ${c}">${safe(s.price)}</span>
+        <span class="watch-full-chg ${c}">${sign(s.change)}${safe(s.change)}</span>
+        <span class="watch-full-pct ${c}">${sign(s.changePercent)}${safe(s.changePercent)}%</span>
+        <span class="watch-full-amount">${fmtAmt(s.amount)}</span>
+      </div>
+    `;
+  }).join("");
+  container.innerHTML = html;
+  container.querySelectorAll(".watch-full-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      openDetail(el.dataset.secid, el.dataset.name, el.dataset.code);
+      currentKlineSecid = el.dataset.secid;
+      loadKline(el.dataset.secid, el.dataset.name);
+    });
+  });
+}
+
+// ── 预警全屏视图 ──────────────────────────────────
+async function loadAlertsFull() {
+  const container = document.getElementById("alertListFull");
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div>加载中…</div></div>';
+  const resp = await sendMsg({ action: "getAlerts" });
+  if (!resp || !resp.success) {
+    container.innerHTML = '<div class="empty-state">加载失败</div>';
+    return;
+  }
+  const alerts = resp.data ?? [];
+  if (alerts.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔔</div><div>暂无预警，通过 Popup 添加</div></div>';
+    return;
+  }
+  const typeLabel = { above: "涨到", below: "跌到", pct: "涨跌幅达" };
+  const typeUnit = { above: "元", below: "元", pct: "%" };
+  let html = '<div class="alert-full-header"><span>股票名称</span><span>预警条件</span><span>目标值</span><span>状态</span></div>';
+  html += alerts.map((a) => `
+    <div class="alert-full-row">
+      <div><div class="alert-row-name">${a.name}</div><div class="alert-row-desc">${a.code || a.secid}</div></div>
+      <span style="font-size:12px;color:var(--text-2)">${typeLabel[a.type]}</span>
+      <span style="font-family:var(--font-mono);font-weight:600">${a.target}${typeUnit[a.type]}</span>
+      <span class="alert-row-status ${a.triggered ? "status-triggered" : "status-active"}">${a.triggered ? "已触发" : "监控中"}</span>
+    </div>
+  `).join("");
+  container.innerHTML = html;
+}
+
+// ── 条件选股器 ──────────────────────────────────
+function initScreener() {
+  const btnRun = document.getElementById("btnScreenRun");
+  const btnReset = document.getElementById("btnScreenReset");
+  if (btnRun) btnRun.addEventListener("click", runScreener);
+  if (btnReset) btnReset.addEventListener("click", resetScreener);
+}
+
+async function runScreener() {
+  const resultsEl = document.getElementById("screenResults");
+  const statsEl = document.getElementById("screenStats");
+  const btnRun = document.getElementById("btnScreenRun");
+
+  // 收集筛选条件
+  const conditions = {};
+
+  // 涨跌幅
+  const chgOp = document.getElementById("screenChgOp").value;
+  const chgV1 = parseFloat(document.getElementById("screenChgVal1").value);
+  const chgV2 = parseFloat(document.getElementById("screenChgVal2").value);
+  if (!isNaN(chgV1)) conditions.chg = { op: chgOp, v1: chgV1, v2: !isNaN(chgV2) ? chgV2 : null };
+
+  // PE
+  const peOp = document.getElementById("screenPeOp").value;
+  const peV1 = parseFloat(document.getElementById("screenPeVal1").value);
+  const peV2 = parseFloat(document.getElementById("screenPeVal2").value);
+  if (!isNaN(peV1)) conditions.pe = { op: peOp, v1: peV1, v2: !isNaN(peV2) ? peV2 : null };
+
+  // PB
+  const pbOp = document.getElementById("screenPbOp").value;
+  const pbV1 = parseFloat(document.getElementById("screenPbVal1").value);
+  const pbV2 = parseFloat(document.getElementById("screenPbVal2").value);
+  if (!isNaN(pbV1)) conditions.pb = { op: pbOp, v1: pbV1, v2: !isNaN(pbV2) ? pbV2 : null };
+
+  // 成交额
+  const amtMin = parseFloat(document.getElementById("screenAmtUnit").value);
+  conditions.amtMin = amtMin;
+
+  // 换手率
+  const turnOp = document.getElementById("screenTurnOp").value;
+  const turnVal = parseFloat(document.getElementById("screenTurnVal").value);
+  if (!isNaN(turnVal)) conditions.turn = { op: turnOp, val: turnVal };
+
+  // 排序
+  conditions.sort = document.getElementById("screenSort").value;
+
+  resultsEl.innerHTML = '<div class="empty-state"><div class="loading-spin"></div><div style="margin-top:8px">正在筛选全市场股票…</div></div>';
+  btnRun.disabled = true;
+  btnRun.textContent = "筛选中…";
+  if (statsEl) statsEl.innerHTML = "";
+
+  try {
+    const resp = await sendMsg({ action: "screener", conditions });
+    if (!resp || !resp.success || !resp.data) {
+      resultsEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div>筛选失败，请稍后重试</div></div>';
+      return;
+    }
+    const stocks = resp.data;
+    if (stocks.length === 0) {
+      resultsEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div>没有符合条件的股票，请放宽筛选条件</div></div>';
+      if (statsEl) statsEl.innerHTML = "符合条件：<span class='count'>0</span> 只";
+      return;
+    }
+    if (statsEl) statsEl.innerHTML = `符合条件：<span class="count">${stocks.length}</span> 只 · 按条件排序`;
+    let html = '<div class="screen-header"><span>#</span><span>名称/代码</span><span>现价</span><span>涨跌幅</span><span>PE</span><span>PB</span><span>成交额</span></div>';
+    html += stocks.map((s, i) => {
+      const c = cls(s.pct);
+      const secid = guessSecid(s.code);
+      return `
+        <div class="screen-result-row" data-secid="${secid}" data-name="${s.name}" data-code="${s.code}">
+          <span class="screen-rank">${i + 1}</span>
+          <div><div class="screen-name">${s.name}</div><div class="screen-code">${s.code}</div></div>
+          <span class="screen-price ${c}">${safe(s.price)}</span>
+          <span class="screen-pct ${c}">${sign(s.pct)}${safe(s.pct)}%</span>
+          <span class="screen-pe">${s.pe != null ? safe(s.pe, 1) : "--"}</span>
+          <span class="screen-pb">${s.pb != null ? safe(s.pb, 1) : "--"}</span>
+          <span class="screen-amount">${fmtAmt(s.amount)}</span>
+        </div>
+      `;
+    }).join("");
+    resultsEl.innerHTML = html;
+    resultsEl.querySelectorAll(".screen-result-row").forEach((el) => {
+      el.addEventListener("click", () => {
+        openDetail(el.dataset.secid, el.dataset.name, el.dataset.code);
+        currentKlineSecid = el.dataset.secid;
+        loadKline(el.dataset.secid, el.dataset.name);
+      });
+    });
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="empty-state">筛选出错</div>';
+  } finally {
+    btnRun.disabled = false;
+    btnRun.textContent = "🔍 开始筛选";
+  }
+}
+
+function resetScreener() {
+  ["screenChgVal1", "screenChgVal2", "screenPeVal1", "screenPeVal2", "screenPbVal1", "screenPbVal2", "screenTurnVal"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById("screenResults").innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div>设置筛选条件后点击「开始筛选」</div></div>';
+  document.getElementById("screenStats").innerHTML = "";
 }
