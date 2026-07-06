@@ -12,6 +12,7 @@ let searchDebounce = null;
 let searchResults = [];
 let searchHlIdx = -1;
 let refreshTimer = null;
+let currentDetailStock = null; // 当前详情面板的股票 { secid, name, code, price }
 
 // ═══ 工具函数 ═══
 function safe(v, d = 2) {
@@ -228,6 +229,47 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // ── 详情侧栏操作按钮 ──
+  const detailBtnWatch = document.getElementById("detailBtnWatch");
+  if (detailBtnWatch) detailBtnWatch.addEventListener("click", detailActionAddWatchlist);
+  const detailBtnPosition = document.getElementById("detailBtnPosition");
+  if (detailBtnPosition) detailBtnPosition.addEventListener("click", detailActionAddPosition);
+  const detailBtnAlert = document.getElementById("detailBtnAlert");
+  if (detailBtnAlert) detailBtnAlert.addEventListener("click", detailActionAddAlert);
+
+  // ── Modal 关闭逻辑 ──
+  document.querySelectorAll(".modal-close").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.modal;
+      if (id) document.getElementById(id).style.display = "none";
+    });
+  });
+  // 点击遮罩关闭
+  document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.style.display = "none";
+    });
+  });
+  // 持仓确认
+  const posConfirm = document.getElementById("posConfirm");
+  if (posConfirm) posConfirm.addEventListener("click", confirmAddPosition);
+  // 预警确认
+  const alertConfirm = document.getElementById("alertConfirm");
+  if (alertConfirm) alertConfirm.addEventListener("click", confirmAddAlert);
+  // 预警类型联动标签
+  const alertTypeSel = document.getElementById("alertType");
+  if (alertTypeSel) alertTypeSel.addEventListener("change", () => {
+    const label = document.getElementById("alertTargetLabel");
+    const inp = document.getElementById("alertTarget");
+    if (alertTypeSel.value === "pct") {
+      label.textContent = "涨跌幅 (%)";
+      inp.placeholder = "如 5.0";
+    } else {
+      label.textContent = "目标价格";
+      inp.placeholder = "如 15.00";
+    }
+  });
+
   // ── 条件选股器 ──
   initScreener();
 
@@ -270,12 +312,33 @@ function renderDropdown() {
       <span class="search-item-name">${item.name}</span>
       <span class="search-item-code">${item.code}</span>
       ${item.marketType ? `<span class="search-item-market">${item.marketType}</span>` : ""}
+      <div class="search-item-actions">
+        <button class="search-act-btn search-act-watch" data-idx="${idx}" title="加入自选">⭐</button>
+        <button class="search-act-btn search-act-pos" data-idx="${idx}" title="加入持仓">💼</button>
+      </div>
     </div>
   `).join("");
   dd.querySelectorAll(".search-item").forEach((el) => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (e) => {
+      // 如果点击的是操作按钮，不触发展开
+      if (e.target.closest(".search-act-btn")) return;
       const idx = parseInt(el.dataset.idx);
       if (searchResults[idx]) selectStock(searchResults[idx]);
+    });
+  });
+  // 绑定快捷操作按钮
+  dd.querySelectorAll(".search-act-watch").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      if (searchResults[idx]) quickAddWatchlist(searchResults[idx]);
+    });
+  });
+  dd.querySelectorAll(".search-act-pos").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      if (searchResults[idx]) quickAddPosition(searchResults[idx]);
     });
   });
 }
@@ -766,11 +829,15 @@ async function openDetail(secid, name, code) {
   document.getElementById("detailPrice").textContent = "加载中…";
   document.getElementById("detailChange").textContent = "";
 
+  // 存储当前详情股票信息
+  currentDetailStock = { secid, name: name || "", code: code || "", price: 0 };
+
   // 获取行情
   const resp = await sendMsg({ action: "getQuoteBySecid", secid });
   if (resp && resp.success && resp.data) {
     const d = resp.data;
     const c = cls(d.changePercent);
+    currentDetailStock.price = d.price;
     document.getElementById("detailPrice").textContent = safe(d.price);
     document.getElementById("detailPrice").className = "detail-price " + c;
     document.getElementById("detailChange").textContent = `${sign(d.change)}${safe(d.change)}  (${sign(d.changePercent)}${safe(d.changePercent)}%)`;
@@ -800,6 +867,8 @@ async function openDetail(secid, name, code) {
   if (code) loadNews(code);
   // V6: 财务指标
   if (code) loadFinance(code);
+  // 检查是否已在自选股
+  checkDetailWatchStatus(secid);
 }
 
 async function loadTrend(secid) {
@@ -1602,4 +1671,174 @@ function resetScreener() {
   });
   document.getElementById("screenResults").innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div>设置筛选条件后点击「开始筛选」</div></div>';
   document.getElementById("screenStats").innerHTML = "";
+}
+
+// ════════════════════════════════════════════════════════════
+// V8.1 新增：自选/持仓/预警 添加功能
+// ════════════════════════════════════════════════════════════
+
+// ── Toast 提示 ──────────────────────────────────
+function showToast(msg, type = "success") {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+  const icons = { success: "✅", error: "❌", info: "ℹ️" };
+  const toast = document.createElement("div");
+  toast.className = "toast " + type;
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || "✅"}</span><span class="toast-msg">${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ── 检查详情面板的自选状态 ──────────────────────────────────
+async function checkDetailWatchStatus(secid) {
+  const btn = document.getElementById("detailBtnWatch");
+  if (!btn) return;
+  const resp = await sendMsg({ action: "checkWatchlist", secid });
+  if (resp && resp.success && resp.data) {
+    btn.classList.add("active");
+    btn.textContent = "★ 已选";
+  } else {
+    btn.classList.remove("active");
+    btn.textContent = "⭐ 自选";
+  }
+}
+
+// ── 详情面板：加入自选 ──────────────────────────────────
+async function detailActionAddWatchlist() {
+  if (!currentDetailStock) return;
+  const { secid, name, code } = currentDetailStock;
+  const btn = document.getElementById("detailBtnWatch");
+  if (btn && btn.classList.contains("active")) {
+    // 已在自选，执行移除
+    const resp = await sendMsg({ action: "removeFromWatchlist", secid });
+    if (resp && resp.success) {
+      btn.classList.remove("active");
+      btn.textContent = "⭐ 自选";
+      showToast(`已从自选股移除 ${name}`, "info");
+      loadWatchlist();
+      loadTicker();
+    }
+  } else {
+    // 加入自选
+    const resp = await sendMsg({ action: "addToWatchlist", stock: { secid, name, code } });
+    if (resp && resp.success) {
+      btn.classList.add("active");
+      btn.textContent = "★ 已选";
+      showToast(`已添加 ${name} 到自选股`, "success");
+      loadWatchlist();
+      loadTicker();
+    } else {
+      showToast("添加失败，请重试", "error");
+    }
+  }
+}
+
+// ── 详情面板：添加持仓（弹出 Modal）──────────────────────────
+function detailActionAddPosition() {
+  if (!currentDetailStock) return;
+  const { name, code, price } = currentDetailStock;
+  const info = document.getElementById("positionStockInfo");
+  info.innerHTML = `<span class="msi-name">${name}</span><span class="msi-code">${code}</span><span class="msi-price ${cls(price)}">${safe(price)}</span>`;
+  // 预填当前价
+  const costInput = document.getElementById("posCostPrice");
+  if (costInput && price > 0) costInput.value = price;
+  document.getElementById("posQuantity").value = "";
+  document.getElementById("positionModal").style.display = "flex";
+  setTimeout(() => costInput.focus(), 100);
+}
+
+// ── 确认添加持仓 ──────────────────────────────────
+async function confirmAddPosition() {
+  if (!currentDetailStock) return;
+  const costPrice = parseFloat(document.getElementById("posCostPrice").value);
+  const quantity = parseFloat(document.getElementById("posQuantity").value);
+  if (isNaN(costPrice) || costPrice <= 0) { showToast("请输入有效的买入价", "error"); return; }
+  if (isNaN(quantity) || quantity <= 0) { showToast("请输入有效的持仓数量", "error"); return; }
+
+  const { secid, name, code } = currentDetailStock;
+  const resp = await sendMsg({
+    action: "addPosition",
+    position: { secid, name, code, costPrice, quantity },
+  });
+  if (resp && resp.success) {
+    showToast(`已添加持仓：${name} ${quantity}股 @ ${costPrice.toFixed(3)}`, "success");
+    document.getElementById("positionModal").style.display = "none";
+    loadPortfolio();
+    if (currentView === "portfolio") loadPortfolioAnalysis();
+  } else {
+    showToast("添加持仓失败", "error");
+  }
+}
+
+// ── 详情面板：设置预警（弹出 Modal）──────────────────────────
+function detailActionAddAlert() {
+  if (!currentDetailStock) return;
+  const { name, code, price } = currentDetailStock;
+  const info = document.getElementById("alertStockInfo");
+  info.innerHTML = `<span class="msi-name">${name}</span><span class="msi-code">${code}</span><span class="msi-price ${cls(price)}">${safe(price)}</span>`;
+  // 重置
+  document.getElementById("alertType").value = "above";
+  document.getElementById("alertTargetLabel").textContent = "目标价格";
+  const targetInput = document.getElementById("alertTarget");
+  targetInput.value = price > 0 ? (price * 1.1).toFixed(2) : "";
+  targetInput.placeholder = "如 15.00";
+  document.getElementById("alertModal").style.display = "flex";
+  setTimeout(() => targetInput.focus(), 100);
+}
+
+// ── 确认设置预警 ──────────────────────────────────
+async function confirmAddAlert() {
+  if (!currentDetailStock) return;
+  const type = document.getElementById("alertType").value;
+  const target = parseFloat(document.getElementById("alertTarget").value);
+  if (isNaN(target) || target <= 0) { showToast("请输入有效的目标值", "error"); return; }
+
+  const { secid, name, code } = currentDetailStock;
+  const resp = await sendMsg({
+    action: "addAlert",
+    alert: { secid, name, code, type, target },
+  });
+  if (resp && resp.success) {
+    const typeLabel = { above: "涨到", below: "跌到", pct: "涨跌幅达" };
+    const unit = type === "pct" ? "%" : "元";
+    showToast(`已设置预警：${name} ${typeLabel[type]} ${target}${unit}`, "success");
+    document.getElementById("alertModal").style.display = "none";
+    loadAlerts();
+    if (currentView === "alerts") loadAlertsFull();
+  } else {
+    showToast("设置预警失败", "error");
+  }
+}
+
+// ── 搜索下拉：快速添加自选 ──────────────────────────────────
+async function quickAddWatchlist(item) {
+  const resp = await sendMsg({ action: "addToWatchlist", stock: { secid: item.secid, name: item.name, code: item.code } });
+  if (resp && resp.success) {
+    showToast(`已添加 ${item.name} 到自选股`, "success");
+    loadWatchlist();
+    loadTicker();
+  } else {
+    showToast("添加失败", "error");
+  }
+}
+
+// ── 搜索下拉：快速添加持仓 ──────────────────────────────────
+function quickAddPosition(item) {
+  // 先获取实时价格
+  currentDetailStock = { secid: item.secid, name: item.name, code: item.code, price: 0 };
+  // 用详情面板的 Modal
+  detailActionAddPosition();
+  // 异步获取价格更新
+  sendMsg({ action: "getQuoteBySecid", secid: item.secid }).then((resp) => {
+    if (resp && resp.success && resp.data) {
+      currentDetailStock.price = resp.data.price;
+      const info = document.getElementById("positionStockInfo");
+      if (info) {
+        const priceEl = info.querySelector(".msi-price");
+        if (priceEl) { priceEl.textContent = safe(resp.data.price); priceEl.className = "msi-price " + cls(resp.data.changePercent); }
+      }
+      const costInput = document.getElementById("posCostPrice");
+      if (costInput && !costInput.value) costInput.value = resp.data.price;
+    }
+  });
 }
