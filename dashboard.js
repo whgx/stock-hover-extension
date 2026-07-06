@@ -305,11 +305,15 @@ async function loadIndices() {
   }
   bar.innerHTML = resp.data.map((idx) => {
     const c = cls(idx.pct);
+    const changeStr = idx.change != null ? (idx.change >= 0 ? "+" : "") + safe(idx.change) : "";
+    const amtStr = idx.amount != null ? fmtAmt(idx.amount) : "";
     return `
       <div class="index-item" data-secid="${idx.secid}">
         <div class="index-name">${idx.name}</div>
         <div class="index-price ${c}">${safe(idx.price)}</div>
+        <div class="index-change ${c}">${changeStr}</div>
         <div class="index-pct ${c}">${sign(idx.pct)}${safe(idx.pct)}%</div>
+        ${amtStr ? `<div class="index-amount">${amtStr}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -331,17 +335,34 @@ async function loadSentiment() {
   const resp = await sendMsg({ action: "getMarketSentiment" });
   if (!resp || !resp.success || !resp.data) return;
   const d = resp.data;
-  document.getElementById("sentimentBar").style.display = "flex";
-  document.getElementById("sentUp").textContent = d.up || 0;
-  document.getElementById("sentDown").textContent = d.down || 0;
-  document.getElementById("sentFlat").textContent = d.flat || 0;
-  document.getElementById("sentLimitUp").textContent = d.limitUp || 0;
-  document.getElementById("sentLimitDown").textContent = d.limitDown || 0;
-  // 更新右侧面板情绪统计块
+  const bar = document.getElementById("sentimentBar");
+  if (bar) {
+    const total = (d.up || 0) + (d.down || 0) + (d.flat || 0);
+    const upPct = total > 0 ? ((d.up / total) * 100).toFixed(1) : 0;
+    const downPct = total > 0 ? ((d.down / total) * 100).toFixed(1) : 0;
+    const flatPct = total > 0 ? 100 - parseFloat(upPct) - parseFloat(downPct) : 0;
+    // 顶部条改为紧凑涨跌比可视化
+    bar.style.display = "flex";
+    bar.innerHTML = `
+      <div class="sent-ratio-bar">
+        <div class="sent-ratio-up" style="width:${upPct}%" title="上涨 ${d.up || 0}"></div>
+        <div class="sent-ratio-flat" style="width:${flatPct}%" title="平盘 ${d.flat || 0}"></div>
+        <div class="sent-ratio-down" style="width:${downPct}%" title="下跌 ${d.down || 0}"></div>
+      </div>
+      <span class="sent-ratio-text up">${d.up || 0} 红</span>
+      <span class="sent-ratio-sep">/</span>
+      <span class="sent-ratio-text down">${d.down || 0} 绿</span>
+      <span class="sent-ratio-sep">·</span>
+      <span class="sent-ratio-text">涨停 <b class="up">${d.limitUp || 0}</b></span>
+      <span class="sent-ratio-sep">·</span>
+      <span class="sent-ratio-text">跌停 <b class="down">${d.limitDown || 0}</b></span>
+    `;
+  }
+  // 更新右侧面板情绪统计块（详细数字保留）
   const sentStats = document.getElementById("sentStats");
   if (sentStats) {
-    const total = (d.up || 0) + (d.down || 0) + (d.flat || 0);
-    const ratio = total > 0 ? Math.round((d.up / total) * 100) : 0;
+    const total2 = (d.up || 0) + (d.down || 0) + (d.flat || 0);
+    const ratio = total2 > 0 ? Math.round((d.up / total2) * 100) : 0;
     sentStats.innerHTML = `
       <div class="sent-stat-box up">
         <div class="sent-stat-num up">${d.up || 0}</div>
@@ -544,7 +565,7 @@ async function loadKline(secid, name) {
   titleEl.textContent = (name || "") + " · " + (currentKlinePeriod === 101 ? "日K" : currentKlinePeriod === 102 ? "周K" : "月K");
   infoEl.textContent = "加载中…";
 
-  const resp = await sendMsg({ action: "getKline", secid, count: 120 });
+  const resp = await sendMsg({ action: "getKline", secid, count: 120, period: currentKlinePeriod });
   if (!resp || !resp.success || !resp.data) {
     drawKlineEmpty(canvas, ctx, "暂无K线数据");
     infoEl.textContent = "";
@@ -958,42 +979,34 @@ async function loadTicker() {
   if (!track) return;
   // 获取自选股 + 一些热门股
   let codes = [];
-  const watchResp = await sendMsg({ action: "getWatchlist" });
+  const watchResp = await sendMsg({ action: "getWatchlistQuotes" });
   if (watchResp && watchResp.success && watchResp.data) {
-    codes = watchResp.data.slice(0, 10);
+    codes = watchResp.data.slice(0, 10).map((s) => ({ secid: s.secid, name: s.name, code: s.code, price: s.price, changePercent: s.changePercent }));
   }
   // 如果自选股太少，加入热门股
   if (codes.length < 5) {
     const hotResp = await sendMsg({ action: "getHotStocks", rankType: "amount" });
     if (hotResp && hotResp.success && hotResp.data) {
-      const hot = hotResp.data.slice(0, 10).map((s) => ({
-        secid: guessSecid(s.code),
-        name: s.name,
-        code: s.code,
-      }));
-      codes = [...codes, ...hot];
+      codes = [...codes, ...hotResp.data.slice(0, 10).map((s) => ({
+        secid: guessSecid(s.code), name: s.name, code: s.code, price: s.price, changePercent: s.pct,
+      }))];
     }
   }
   if (codes.length === 0) {
     track.innerHTML = '<span style="color:#888;padding:0 20px">暂无行情数据</span>';
     return;
   }
-  // 获取行情
-  const html = [];
-  for (const s of codes) {
-    const resp = await sendMsg({ action: "getQuoteBySecid", secid: s.secid });
-    if (resp && resp.success && resp.data) {
-      const d = resp.data;
-      const c = cls(d.changePercent);
-      html.push(`
-        <span class="ticker-item" data-secid="${s.secid}" data-name="${d.name}" data-code="${d.code}">
-          <span class="ticker-name">${d.name}</span>
-          <span class="ticker-price ${c}">${safe(d.price)}</span>
-          <span class="ticker-pct ${c}">${sign(d.changePercent)}${safe(d.changePercent)}%</span>
-        </span>
-      `);
-    }
-  }
+  // 使用已批量获取的数据直接渲染（无需再逐个请求）
+  const html = codes.map((s) => {
+    const c = cls(s.changePercent);
+    return `
+      <span class="ticker-item" data-secid="${s.secid}" data-name="${s.name}" data-code="${s.code}">
+        <span class="ticker-name">${s.name}</span>
+        <span class="ticker-price ${c}">${safe(s.price)}</span>
+        <span class="ticker-pct ${c}">${sign(s.changePercent)}${safe(s.changePercent)}%</span>
+      </span>
+    `;
+  });
   // 复制一份实现无缝滚动
   track.innerHTML = html.join("") + html.join("");
   // 绑定点击

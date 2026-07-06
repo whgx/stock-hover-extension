@@ -623,17 +623,17 @@ async function getPortfolioQuotes() {
 // ════════════════════════════════════════════════════════════
 // 14. K线数据（日K + 均线）
 // ════════════════════════════════════════════════════════════
-async function fetchKlineData(secid, count = 120) {
+async function fetchKlineData(secid, count = 120, period = 101) {
   const url =
     "https://push2his.eastmoney.com/api/qt/stock/kline/get?" +
     "ut=fa5fd1943c7b386f172d6893dbfd32" +
     "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13" +
     "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61" +
-    "&klt=101&fqt=1&secid=" + secid +
+    "&klt=" + period + "&fqt=1&secid=" + secid +
     "&lmt=" + count;
 
   try {
-    const resp = await fetch(url);
+    const resp = await fetchWithHeaders(url);
     const json = await resp.json();
     const klines = json?.data?.klines ?? [];
     if (klines.length === 0) return null;
@@ -795,6 +795,10 @@ async function fetchSectorData() {
 // 17. 涨跌停统计 / 市场情绪
 // ════════════════════════════════════════════════════════════
 async function fetchMarketSentiment() {
+  // 内存缓存：30 秒内复用，避免 5 秒刷新时重复拉 5000 条
+  if (fetchMarketSentiment._cache && Date.now() - fetchMarketSentiment._cacheTime < 30000) {
+    return fetchMarketSentiment._cache;
+  }
   // 涨停 / 跌停 / 涨跌家数
   const url =
     "https://push2.eastmoney.com/api/qt/clist/get?" +
@@ -837,7 +841,10 @@ async function fetchMarketSentiment() {
       }
     }
 
-    return { total, up, down, flat, limitUp, limitDown };
+    const result = { total, up, down, flat, limitUp, limitDown };
+    fetchMarketSentiment._cache = result;
+    fetchMarketSentiment._cacheTime = Date.now();
+    return result;
   } catch (e) {
     console.error("[行情助手] 市场情绪获取失败:", e);
     return { total: 0, up: 0, down: 0, flat: 0, limitUp: 0, limitDown: 0 };
@@ -1159,26 +1166,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // ── 批量获取自选股行情（供 Popup 使用）──
       case "getWatchlistQuotes": {
         const list = await getWatchlist();
-        const baseUrl =
-          "https://push2.eastmoney.com/api/qt/stock/get?" +
-          "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2" +
-          "&fields=f43,f57,f58,f169,f170,f107&secid=";
         const results = [];
-        for (const s of list) {
-          let d = await fetchQuote(baseUrl + s.secid);
-          if (!d || !d.f58) {
-            // 腾讯 fallback
-            d = await fetchQuoteTencent(s.secid);
-          }
-          if (d && d.f58) {
-            results.push({
-              secid: s.secid,
-              code: d.f57 || s.code,
-              name: d.f58,
-              price: d.f43,
-              change: d.f169,
-              changePercent: d.f170,
-            });
+        if (list.length > 0) {
+          // 批量请求（ulist.np/get 支持多 secid）
+          const secidsParam = list.map((s) => "secids=" + s.secid).join("&");
+          const batchUrl =
+            "https://push2.eastmoney.com/api/qt/ulist.np/get?" +
+            "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&" +
+            "fields=f2,f3,f4,f12,f14,f104,f105,f6,f152&" + secidsParam;
+          try {
+            const json = await fetchWithHeaders(batchUrl);
+            const diff = json?.data?.diff ?? [];
+            const batchMap = {};
+            for (const d of diff) {
+              batchMap[d.f12] = d;
+            }
+            for (const s of list) {
+              let d = batchMap[s.code] || batchMap[s.secid];
+              if (!d || d.f2 == null) {
+                // 腾讯 fallback
+                const tcData = await fetchQuoteTencent(s.secid);
+                if (tcData) {
+                  results.push({
+                    secid: s.secid,
+                    code: s.code,
+                    name: s.name || tcData.f58,
+                    price: tcData.f43,
+                    change: tcData.f169,
+                    changePercent: tcData.f170,
+                  });
+                }
+              } else {
+                results.push({
+                  secid: s.secid,
+                  code: d.f12 || s.code,
+                  name: d.f14 || s.name,
+                  price: d.f2,
+                  change: d.f4,
+                  changePercent: d.f3,
+                });
+              }
+            }
+          } catch (e) {
+            console.error("[行情助手] 批量行情失败，降级逐个请求:", e);
           }
         }
         return { success: true, data: results };
@@ -1247,7 +1277,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // ── K线数据（Dashboard 使用）──
       case "getKline": {
-        const kline = await fetchKlineData(request.secid, request.count || 120);
+        const kline = await fetchKlineData(request.secid, request.count || 120, request.period || 101);
         if (!kline) return { success: false, error: "无K线数据" };
         return { success: true, data: kline };
       }

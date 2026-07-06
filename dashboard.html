@@ -96,35 +96,8 @@
         <div class="index-loading">加载指数中…</div>
       </div>
 
-      <!-- 市场情绪条 -->
-      <div id="sentimentBar" class="sentiment-bar" style="display:none">
-        <div class="sentiment-item">
-          <span class="sentiment-num up" id="sentUp">0</span>
-          <span class="sentiment-label">上涨</span>
-        </div>
-        <div class="sentiment-item">
-          <span class="sentiment-num down" id="sentDown">0</span>
-          <span class="sentiment-label">下跌</span>
-        </div>
-        <div class="sentiment-item">
-          <span class="sentiment-num" id="sentFlat">0</span>
-          <span class="sentiment-label">平盘</span>
-        </div>
-        <div class="sentiment-divider"></div>
-        <div class="sentiment-item">
-          <span class="sentiment-num up" id="sentLimitUp">0</span>
-          <span class="sentiment-label">涨停</span>
-        </div>
-        <div class="sentiment-item">
-          <span class="sentiment-num down" id="sentLimitDown">0</span>
-          <span class="sentiment-label">跌停</span>
-        </div>
-        <div class="sentiment-divider"></div>
-        <button class="sentiment-item sentiment-btn" id="btnLimitUp">📈 涨停板</button>
-        <button class="sentiment-item sentiment-btn" id="btnLimitDown">📉 跌停板</button>
-        <button class="sentiment-item sentiment-btn" id="btnGainers">🔥 涨幅榜</button>
-        <button class="sentiment-item sentiment-btn" id="btnLosers">❄️ 跌幅榜</button>
-      </div>
+      <!-- 市场情绪条（紧凑涨跌比 + 快捷按钮，详细统计在右列 sentStats） -->
+      <div id="sentimentBar" class="sentiment-bar" style="display:none"></div>
 
       <!-- ═══════════════════════════════════════════════════
            视图区域
