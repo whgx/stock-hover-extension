@@ -172,6 +172,7 @@
             <div class="card-header">
               <h3>⭐ 自选股看板</h3>
               <span class="card-sub" id="watchlistCountFull"></span>
+              <button class="btn-add-stock" id="btnAddWatchlist" title="添加自选股">＋ 添加自选</button>
             </div>
             <div id="watchlistFullGrid" class="watchlist-full-grid"></div>
           </div>
@@ -182,7 +183,10 @@
       <main id="viewPortfolio" class="content-view">
         <div class="single-col">
           <div class="card">
-            <div class="card-header"><h3>💼 持仓总览</h3></div>
+            <div class="card-header">
+              <h3>💼 持仓总览</h3>
+              <button class="btn-add-stock" id="btnAddPosition" title="添加持仓">＋ 添加持仓</button>
+            </div>
             <div class="portfolio-dashboard">
               <div class="pd-summary" id="pdSummary"></div>
               <div class="pd-pie-wrap">
@@ -458,6 +462,24 @@
         <div class="modal-footer">
           <button class="btn-modal-cancel modal-close" data-modal="alertModal">取消</button>
           <button class="btn-modal-confirm" id="alertConfirm">确认设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 股票选择器 Modal（用于自选股/持仓页面添加）-->
+  <div id="stockPickerModal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="stockPickerTitle">🔍 搜索添加股票</h3>
+        <button class="btn-icon modal-close" data-modal="stockPickerModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="picker-search-wrap">
+          <input type="text" id="pickerSearchInput" class="picker-search-input" placeholder="输入股票名称或代码…" autocomplete="off">
+        </div>
+        <div id="pickerResults" class="picker-results">
+          <div class="picker-empty">请输入关键词搜索股票</div>
         </div>
       </div>
     </div>

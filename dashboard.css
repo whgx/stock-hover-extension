@@ -856,6 +856,51 @@ body {
 }
 .search-act-btn:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 
+/* ═══ 卡片头部添加按钮 ═══ */
+.btn-add-stock {
+  background: var(--blue); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  padding: 4px 12px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: opacity 0.12s, transform 0.12s;
+  white-space: nowrap; height: 26px;
+  display: flex; align-items: center; gap: 3px;
+}
+.btn-add-stock:hover { opacity: 0.85; transform: scale(1.03); }
+.btn-add-stock:active { transform: scale(0.97); }
+
+/* ═══ 股票选择器 Modal ═══ */
+.picker-search-wrap { margin-bottom: 12px; }
+.picker-search-input {
+  width: 100%; background: var(--panel-2);
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+  padding: 9px 12px; color: var(--text); font-size: 14px;
+  outline: none; transition: border-color 0.12s;
+}
+.picker-search-input:focus { border-color: var(--blue); }
+.picker-results { max-height: 340px; overflow-y: auto; }
+.picker-empty { text-align: center; color: var(--text-3); font-size: 13px; padding: 30px 0; }
+.picker-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background 0.1s; border-bottom: 1px solid var(--border);
+}
+.picker-item:hover { background: var(--hover); }
+.picker-item-info { flex: 1; min-width: 0; }
+.picker-item-name { font-size: 13px; font-weight: 600; }
+.picker-item-code { font-size: 11px; color: var(--text-2); font-family: var(--font-mono); }
+.picker-item-market { font-size: 10px; color: var(--text-3); }
+.picker-item-actions { display: flex; gap: 4px; }
+.picker-act-btn {
+  background: var(--panel-3); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); padding: 3px 10px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: all 0.1s; white-space: nowrap;
+}
+.picker-act-btn:hover { opacity: 0.85; }
+.picker-act-watch { color: var(--amber); border-color: var(--amber); }
+.picker-act-pos { color: var(--blue); border-color: var(--blue); }
+.picker-loading { text-align: center; padding: 20px; color: var(--text-2); font-size: 12px; }
+
 /* ═══ 响应式 ═══ */
 @media (max-width: 1200px) {
   .main-grid { grid-template-columns: 1fr 240px; }

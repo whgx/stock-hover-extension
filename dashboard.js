@@ -273,6 +273,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── 条件选股器 ──
   initScreener();
 
+  // ── 视图页面「添加」按钮 ──
+  const btnAddWatchlist = document.getElementById("btnAddWatchlist");
+  if (btnAddWatchlist) btnAddWatchlist.addEventListener("click", () => openStockPicker("watchlist"));
+  const btnAddPosition = document.getElementById("btnAddPosition");
+  if (btnAddPosition) btnAddPosition.addEventListener("click", () => openStockPicker("position"));
+
+  // ── 股票选择器搜索 ──
+  const pickerInput = document.getElementById("pickerSearchInput");
+  if (pickerInput) {
+    let pickerDebounce = null;
+    pickerInput.addEventListener("input", () => {
+      const kw = pickerInput.value.trim();
+      if (!kw) { document.getElementById("pickerResults").innerHTML = '<div class="picker-empty">请输入关键词搜索股票</div>'; return; }
+      if (pickerDebounce) clearTimeout(pickerDebounce);
+      pickerDebounce = setTimeout(() => doPickerSearch(kw), 250);
+    });
+  }
+
   // ── 选股器操作符联动 ──
   ["screenChgOp", "screenPeOp", "screenPbOp"].forEach((id) => {
     const sel = document.getElementById(id);
@@ -1841,4 +1859,110 @@ function quickAddPosition(item) {
       if (costInput && !costInput.value) costInput.value = resp.data.price;
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// V8.2 新增：视图页面级股票选择器（自选股/持仓页面添加入口）
+// ════════════════════════════════════════════════════════════
+
+let pickerMode = "watchlist"; // "watchlist" | "position"
+let pickerResults = [];
+
+// ── 打开股票选择器 ──────────────────────────────────
+function openStockPicker(mode) {
+  pickerMode = mode;
+  const modal = document.getElementById("stockPickerModal");
+  const title = document.getElementById("stockPickerTitle");
+  const input = document.getElementById("pickerSearchInput");
+  const resultsEl = document.getElementById("pickerResults");
+  title.textContent = mode === "watchlist" ? "⭐ 添加自选股" : "💼 添加持仓";
+  input.value = "";
+  resultsEl.innerHTML = '<div class="picker-empty">请输入股票名称或代码…</div>';
+  pickerResults = [];
+  modal.style.display = "flex";
+  setTimeout(() => input.focus(), 100);
+}
+
+// ── 选择器搜索 ──────────────────────────────────
+async function doPickerSearch(kw) {
+  const resultsEl = document.getElementById("pickerResults");
+  resultsEl.innerHTML = '<div class="picker-loading"><span class="loading-spin"></span> 搜索中…</div>';
+  const resp = await sendMsg({ action: "searchList", keyword: kw });
+  if (!resp || !resp.success) {
+    resultsEl.innerHTML = '<div class="picker-empty">搜索失败，请重试</div>';
+    return;
+  }
+  pickerResults = resp.data ?? [];
+  if (pickerResults.length === 0) {
+    resultsEl.innerHTML = '<div class="picker-empty">未找到匹配的股票</div>';
+    return;
+  }
+  renderPickerResults();
+}
+
+// ── 渲染选择器结果 ──────────────────────────────────
+function renderPickerResults() {
+  const resultsEl = document.getElementById("pickerResults");
+  const actLabel = pickerMode === "watchlist" ? "⭐ 加自选" : "💼 加持仓";
+  const actClass = pickerMode === "watchlist" ? "picker-act-watch" : "picker-act-pos";
+  resultsEl.innerHTML = pickerResults.map((item, idx) => `
+    <div class="picker-item" data-idx="${idx}">
+      <div class="picker-item-info">
+        <span class="picker-item-name">${item.name}</span>
+        <span class="picker-item-code">${item.code}</span>
+      </div>
+      ${item.marketType ? `<span class="picker-item-market">${item.marketType}</span>` : ""}
+      <div class="picker-item-actions">
+        <button class="picker-act-btn ${actClass}" data-idx="${idx}">${actLabel}</button>
+      </div>
+    </div>
+  `).join("");
+  resultsEl.querySelectorAll(".picker-act-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      if (!pickerResults[idx]) return;
+      if (pickerMode === "watchlist") {
+        pickerAddWatchlist(pickerResults[idx]);
+      } else {
+        pickerAddPosition(pickerResults[idx]);
+      }
+    });
+  });
+}
+
+// ── 选择器：添加自选 ──────────────────────────────────
+async function pickerAddWatchlist(item) {
+  const resp = await sendMsg({ action: "addToWatchlist", stock: { secid: item.secid, name: item.name, code: item.code } });
+  if (resp && resp.success) {
+    showToast(`已添加 ${item.name} 到自选股`, "success");
+    loadWatchlist();
+    loadWatchlistFull();
+    loadTicker();
+    // 关闭选择器
+    document.getElementById("stockPickerModal").style.display = "none";
+  } else {
+    showToast("添加失败，可能已在自选股中", "error");
+  }
+}
+
+// ── 选择器：添加持仓 ──────────────────────────────────
+async function pickerAddPosition(item) {
+  // 获取实时价格
+  let price = 0;
+  const quoteResp = await sendMsg({ action: "getQuoteBySecid", secid: item.secid });
+  if (quoteResp && quoteResp.success && quoteResp.data) price = quoteResp.data.price;
+
+  // 关闭股票选择器
+  document.getElementById("stockPickerModal").style.display = "none";
+
+  // 设置当前详情股票并打开持仓 Modal
+  currentDetailStock = { secid: item.secid, name: item.name, code: item.code, price };
+  const info = document.getElementById("positionStockInfo");
+  info.innerHTML = `<span class="msi-name">${item.name}</span><span class="msi-code">${item.code}</span><span class="msi-price ${cls(price)}">${safe(price)}</span>`;
+  const costInput = document.getElementById("posCostPrice");
+  if (costInput && price > 0) costInput.value = price;
+  document.getElementById("posQuantity").value = "";
+  document.getElementById("positionModal").style.display = "flex";
+  setTimeout(() => costInput.focus(), 100);
 }
