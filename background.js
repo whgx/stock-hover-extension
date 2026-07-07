@@ -792,53 +792,58 @@ async function fetchSectorData() {
 }
 
 // ════════════════════════════════════════════════════════════
-// 17. 涨跌停统计 / 市场情绪
+// 17. 涨跌停统计 / 市场情绪（修复版：用官方指数 f104/f105/f106 精确统计涨跌家数）
 // ════════════════════════════════════════════════════════════
 async function fetchMarketSentiment() {
-  // 内存缓存：30 秒内复用，避免 5 秒刷新时重复拉 5000 条
+  // 内存缓存：30 秒内复用
   if (fetchMarketSentiment._cache && Date.now() - fetchMarketSentiment._cacheTime < 30000) {
     return fetchMarketSentiment._cache;
   }
-  // 涨停 / 跌停 / 涨跌家数
-  const url =
-    "https://push2.eastmoney.com/api/qt/clist/get?" +
-    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
-    "&fid=f3&po=1&pz=1&pn=1" +
-    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
-    "&fields=f2,f3,f4,f12,f14";
 
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
-    const json = await resp.json();
-    const total = json?.data?.total ?? 0;
+    // ── 方案A：用沪深京合计的涨跌家数（上证指数的 f104/f105/f106 反映全 A 股）──
+    // f104=上涨家数, f105=下跌家数, f106=平盘家数
+    const idxUrl =
+      "https://push2.eastmoney.com/api/qt/ulist.np/get?" +
+      "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2" +
+      "&fields=f2,f3,f4,f12,f14,f104,f105,f106" +
+      "&secids=1.000001,0.399001";  // 上证指数+深证成指
+    const idxJson = await fetchWithHeaders(idxUrl);
+    const idxDiff = idxJson?.data?.diff ?? [];
+    const idxItems = Array.isArray(idxDiff) ? idxDiff : Object.values(idxDiff);
 
-    // 获取涨家数 / 跌家数 / 平家数
-    // 使用 f3 排序获取涨跌分布
-    const upUrl =
-      "https://push2.eastmoney.com/api/qt/clist/get?" +
-      "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
-      "&fid=f3&po=1&pz=5000&pn=1" +
-      "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
-      "&fields=f3,f6";
-
-    const upResp = await fetch(upUrl, { headers: EM_HEADERS });
-    const upJson = await upResp.json();
-    const allDiff = upJson?.data?.diff ?? [];
-    const allItems = Array.isArray(allDiff) ? allDiff : Object.values(allDiff);
-
+    // 上证指数 f104/f105/f106 反映沪市，深证成指反映深市，合并
     let up = 0, down = 0, flat = 0;
+    for (const it of idxItems) {
+      up += it.f104 || 0;
+      down += it.f105 || 0;
+      flat += it.f106 || 0;
+    }
+    const total = up + down + flat;
+
+    // ── 方案B：涨跌停数量用官方涨跌停池接口（push2ex）──
+    // 涨停池：getTopicZTPool，跌停池用 clist 跌幅排序取极值（DTPool 接口不稳定）
     let limitUp = 0, limitDown = 0;
-    for (const item of allItems) {
-      const pct = item.f3;
-      if (pct > 0) {
-        up++;
-        if (pct >= 9.9) limitUp++;
-      } else if (pct < 0) {
-        down++;
-        if (pct <= -9.9) limitDown++;
-      } else {
-        flat++;
-      }
+
+    // 涨停：从涨停池获取精确数量
+    try {
+      const todayStr = _getTodayStr(); // YYYYMMDD
+      const ztUrl =
+        "https://push2ex.eastmoney.com/getTopicZTPool?" +
+        "ut=7eea3edcaed734bea9cbfc24409ed989&dpt=wz.ztzt" +
+        "&pageindex=0&pagesize=1&sort=fbt:asc&date=" + todayStr;
+      const ztJson = await fetchWithHeaders(ztUrl);
+      limitUp = ztJson?.data?.tc ?? 0;
+    } catch (e) {
+      // fallback：用本地统计
+      limitUp = await _countLimitByPct(true);
+    }
+
+    // 跌停：用全市场按涨幅升序取前 200 只，本地统计跌幅 <= -9.8%（兼容主板/创业板/科创板/北交所）
+    try {
+      limitDown = await _countLimitByPct(false);
+    } catch (e) {
+      limitDown = 0;
     }
 
     const result = { total, up, down, flat, limitUp, limitDown };
@@ -849,6 +854,50 @@ async function fetchMarketSentiment() {
     console.error("[行情助手] 市场情绪获取失败:", e);
     return { total: 0, up: 0, down: 0, flat: 0, limitUp: 0, limitDown: 0 };
   }
+}
+
+// 获取今日日期字符串 YYYYMMDD
+function _getTodayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + m + day;
+}
+
+// 本地统计涨跌停数量（按板块规则：主板10%, 创业板/科创板20%, 北交所30%）
+// 通过 f12(代码) 前缀判断板块，使用不同阈值
+async function _countLimitByPct(isUp) {
+  // 拉取全市场按涨跌幅排序，取前 500 条即可覆盖所有涨跌停
+  const po = isUp ? "1" : "0"; // 1=降序(涨停从高到低), 0=升序(跌停从低到高)
+  const url =
+    "https://push2.eastmoney.com/api/qt/clist/get?" +
+    "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
+    "&fid=f3&po=" + po + "&pz=500&pn=1" +
+    "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+    "&fields=f3,f12";
+  const json = await fetchWithHeaders(url);
+  const diff = json?.data?.diff ?? [];
+  const items = Array.isArray(diff) ? diff : Object.values(diff);
+
+  let count = 0;
+  for (const item of items) {
+    const pct = item.f3;
+    const code = String(item.f12 || "");
+    // 根据板块确定涨跌停阈值
+    let threshold = 9.8; // 主板默认 10%
+    if (code.startsWith("30") || code.startsWith("68")) threshold = 19.8;  // 创业板/科创板 20%
+    else if (code.startsWith("8") || code.startsWith("92")) threshold = 29.8; // 北交所 30%
+
+    if (isUp) {
+      if (pct >= threshold) count++;
+      else break; // 已排序，遇到不满足的就可以停了
+    } else {
+      if (pct <= -threshold) count++;
+      else break;
+    }
+  }
+  return count;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -880,26 +929,33 @@ async function fetchDragonTiger() {
 }
 
 // ════════════════════════════════════════════════════════════
-// 19. 涨停板/跌停板列表
+// 19. 涨停板/跌停板列表（修复版：正确排序方向 + 板块差异化阈值）
 // ════════════════════════════════════════════════════════════
 async function fetchLimitBoard(type = "up") {
   // type: "up"=涨停, "down"=跌停
-  const sortField = type === "up" ? "f3" : "f3";
-  const sortDir = type === "up" ? "1" : "1";
-  const filter = type === "up" ? "f3:>=9.8" : "f3:<=-9.8";
+  // 涨停：f3 降序 (po=1)，跌停：f3 升序 (po=0)
+  const po = type === "up" ? "1" : "0";
   const url =
     "https://push2.eastmoney.com/api/qt/clist/get?" +
     "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2&np=1" +
-    "&fid=" + sortField + "&po=" + sortDir + "&pz=50&pn=1" +
+    "&fid=f3&po=" + po + "&pz=200&pn=1" +
     "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
     "&fields=f2,f3,f4,f5,f6,f7,f8,f12,f14,f15,f16,f17,f18";
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
-    const json = await resp.json();
+    const json = await fetchWithHeaders(url);
     const diff = json?.data?.diff ?? [];
     const items = Array.isArray(diff) ? diff : Object.values(diff);
+
     return items
-      .filter((i) => type === "up" ? i.f3 >= 9.8 : i.f3 <= -9.8)
+      .filter((i) => {
+        const pct = i.f3;
+        const code = String(i.f12 || "");
+        // 根据板块确定涨跌停阈值
+        let threshold = 9.8;
+        if (code.startsWith("30") || code.startsWith("68")) threshold = 19.8;
+        else if (code.startsWith("8") || code.startsWith("92")) threshold = 29.8;
+        return type === "up" ? pct >= threshold : pct <= -threshold;
+      })
       .map((i) => ({
         code: i.f12,
         name: i.f14,
