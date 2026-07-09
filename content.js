@@ -83,7 +83,7 @@
         <span class="sqc-tab" data-tab="news">公告</span>
       </div>
       <div class="sqc-tab-panel active" data-panel="quote">
-        <div class="sqc-version-tag">📋 v4.2-chart · build-0709b</div>
+        <div class="sqc-version-tag">📋 v4.3-chart · build-0709c</div>
         <div class="sqc-body">
           <div class="sqc-loading">查询中…</div>
         </div>

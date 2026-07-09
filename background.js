@@ -5,16 +5,24 @@
  * v4.1 修复：push2 行情接口添加 Referer/User-Agent 头 + 腾讯接口 fallback
  */
 
-// 东方财富请求头（防 Referer 校验导致空响应）
-const EM_HEADERS = {
-  "Referer": "https://quote.eastmoney.com/",
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-};
+// 东方财富请求头
+// 注意：Chrome MV3 Service Worker 中 Referer 和 User-Agent 是 forbidden headers，
+// 设置它们会导致 fetch() 直接抛 TypeError: Failed to fetch
+// 只保留安全的自定义头
+const EM_HEADERS = {};
 
-// 统一的 fetch 封装：带请求头
+// 统一的 fetch 封装：先带请求头试，失败则裸 fetch 重试
 async function fetchWithHeaders(url) {
-  const resp = await fetch(url, { headers: EM_HEADERS });
-  return resp.json();
+  try {
+    const resp = await fetch(url, { credentials: "omit" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.json();
+  } catch (e) {
+    console.warn("[行情助手] 首次请求失败，重试:", url.slice(0, 80), e.message);
+    // 重试：去掉所有自定义头
+    const resp2 = await fetch(url);
+    return await resp2.json();
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -460,7 +468,7 @@ async function fetchRelatedStocks(secid) {
       "ut=fa5fd1943c7b386f172d6893dbfd32&fltt=2" +
       "&fields=f12,f14,f3,f2&pn=1&pz=6&fs=b:" + boardCode;
     
-    const resp = await fetch(listUrl, { headers: EM_HEADERS });
+    const resp = await fetch(listUrl, { credentials: "omit" });
     const json = await resp.json();
     const diff = json?.data?.diff ?? {};
     const items = Array.isArray(diff) ? diff : Object.values(diff);
@@ -777,7 +785,7 @@ async function fetchSectorData() {
     "&fields=f2,f3,f4,f8,f12,f14,f104,f105,f128,f140,f141";
 
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const json = await resp.json();
     const diff = json?.data?.diff ?? [];
     const items = Array.isArray(diff) ? diff : Object.values(diff);
@@ -918,7 +926,7 @@ async function fetchDragonTiger() {
     "&reportName=RPT_DAILYBILLBOARD_DETAILS" +
     "&columns=ALL&source=WEB&client=WEB";
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const json = await resp.json();
     const items = json?.result?.data ?? [];
     return items.map((i) => ({
@@ -989,7 +997,7 @@ async function fetchStockNews(code) {
     encodeURIComponent(code) +
     "%22%2C%22type%22%3A%5B%22cmsArticleWebOld%22%5D%2C%22client%22%3A%22web%22%2C%22clientType%22%3A%22web%22%2C%22clientVersion%22%3A%22curr%22%2C%22param%22%3A%7B%22cmsArticleWebOld%22%3A%7B%22searchScope%22%3A%22default%22%2C%22sort%22%3A%22default%22%2C%22pageIndex%22%3A1%2C%22pageSize%22%3A10%7D%7D%7D";
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const text = await resp.text();
     // JSONP 格式解析
     const jsonStr = text.replace(/^jQuery\(?/, "").replace(/\);?$/, "");
@@ -1017,7 +1025,7 @@ async function fetchFinanceData(code) {
     "https://emweb.securities.eastmoney.com/PC_HSF10/NewFinanceAnalysis/MainTargetAjax?" +
     "type=0&code=" + marketCode + code;
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const json = await resp.json();
     const items = json?.data ?? [];
     if (items.length === 0) return null;
@@ -1062,7 +1070,7 @@ async function fetchHotStocks(rankType = "amount") {
     "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
     "&fields=f2,f3,f4,f5,f6,f7,f8,f12,f14,f15,f16,f17,f18";
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const json = await resp.json();
     const diff = json?.data?.diff ?? [];
     const items = Array.isArray(diff) ? diff : Object.values(diff);
@@ -1096,7 +1104,7 @@ async function runStockScreener(conditions) {
     "&fields=f2,f3,f6,f8,f9,f12,f14,f15,f16,f23,f84,f85,f100,f115,f128";
 
   try {
-    const resp = await fetch(url, { headers: EM_HEADERS });
+    const resp = await fetch(url, { credentials: "omit" });
     const json = await resp.json();
     let diff = json?.data?.diff ?? [];
     let items = Array.isArray(diff) ? diff : Object.values(diff);
