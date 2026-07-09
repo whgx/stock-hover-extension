@@ -171,6 +171,33 @@
   padding: 0 6px 4px;
 }
 
+#stock-quote-card .sqc-chart-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 0 2px;
+}
+
+#stock-quote-card .sqc-chart-tab {
+  font-size: 10px;
+  color: var(--sqc-label);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+#stock-quote-card .sqc-chart-tab:hover {
+  color: var(--sqc-text);
+  background: var(--sqc-btn-hover);
+}
+
+#stock-quote-card .sqc-chart-tab.active {
+  color: #339af0;
+  background: rgba(51, 154, 240, 0.1);
+  font-weight: 500;
+}
+
 #stock-quote-card .sqc-chart {
   display: block;
 }

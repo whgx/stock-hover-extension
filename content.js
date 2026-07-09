@@ -87,6 +87,10 @@
           <div class="sqc-loading">查询中…</div>
         </div>
         <div class="sqc-chart-wrap" style="display:none;">
+          <div class="sqc-chart-tabs">
+            <span class="sqc-chart-tab active" data-ct="trend">分时</span>
+            <span class="sqc-chart-tab" data-ct="kline">日K</span>
+          </div>
           <canvas class="sqc-chart"></canvas>
           <div class="sqc-chart-time">
             <span class="sqc-time-start">09:30</span>
@@ -189,6 +193,21 @@
         if (tabName === "news" && !card._newsLoaded) loadAnnouncements();
         // 重新定位
         if (card._lastRect) positionCard(card._lastRect);
+      });
+    });
+
+    // 图表 Tab 切换（分时/日K）
+    el.querySelectorAll(".sqc-chart-tab").forEach((tab) => {
+      tab.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const ct = tab.dataset.ct;
+        el.querySelectorAll(".sqc-chart-tab").forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        if (ct === "trend" && currentData) {
+          loadTrendChart(currentData.secid, currentData.preClose || currentData.price || 0);
+        } else if (ct === "kline" && currentData) {
+          loadKlineChart(currentData.secid);
+        }
       });
     });
 
@@ -324,9 +343,9 @@
       </div>
     `;
 
-    // 拉取分时图
-    if (data.secid && data.preClose) {
-      loadTrendChart(data.secid, data.preClose);
+    // 拉取分时图（只要有 secid 就加载，preClose 可为空）
+    if (data.secid) {
+      loadTrendChart(data.secid, data.preClose || data.price || 0);
     }
   }
 
@@ -648,6 +667,126 @@
     chartWrap.style.display = "block";
 
     // 图表加载后卡片高度变化，重新定位
+    if (card._lastRect) positionCard(card._lastRect);
+  }
+
+  // ── 迷你 K线图 ──────────────────────────────────────
+  function loadKlineChart(secid) {
+    safeSendMessage(
+      { action: "getKline", secid, count: 60, period: 101 },
+      (resp) => {
+        if (!card) return;
+        if (!resp || !resp.success || !resp.data || !resp.data.candles || resp.data.candles.length < 2) return;
+        drawKlineMini(resp.data.candles);
+      }
+    );
+  }
+
+  function drawKlineMini(candles) {
+    if (!card) return;
+    const canvas = card.querySelector(".sqc-chart");
+    const chartWrap = card.querySelector(".sqc-chart-wrap");
+    if (!canvas) return;
+
+    const cssW = 308;
+    const cssH = 80;
+    const labelW = 48;
+    const padR = 4;
+    const padT = 4;
+    const padB = 4;
+    const plotW = cssW - labelW - padR;
+    const plotH = cssH - padT - padB;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    // 计算价格范围
+    let minP = Infinity, maxP = -Infinity;
+    for (const c of candles) {
+      if (c.low < minP) minP = c.low;
+      if (c.high > maxP) maxP = c.high;
+    }
+    const range = maxP - minP || 1;
+    const pad = range * 0.1;
+    minP -= pad;
+    maxP += pad;
+
+    const n = candles.length;
+    const cw = plotW / n;
+    const bodyW = Math.max(cw * 0.6, 1.5);
+    const priceToY = (p) => padT + plotH - ((p - minP) / (maxP - minP)) * plotH;
+
+    // 背景网格
+    ctx.strokeStyle = "#f0f0f0";
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (i / 4) * plotH;
+      ctx.beginPath();
+      ctx.moveTo(labelW, y);
+      ctx.lineTo(cssW - padR, y);
+      ctx.stroke();
+    }
+
+    // 绘制蜡烛
+    for (let i = 0; i < n; i++) {
+      const c = candles[i];
+      const isUp = c.close >= c.open;
+      const color = isUp ? "#e33232" : "#00a750";
+      const x = labelW + i * cw + cw / 2;
+
+      // 影线
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, priceToY(c.high));
+      ctx.lineTo(x, priceToY(c.low));
+      ctx.stroke();
+
+      // 实体
+      const yOpen = priceToY(c.open);
+      const yClose = priceToY(c.close);
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyH = Math.max(Math.abs(yClose - yOpen), 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(x - bodyW / 2, bodyTop, bodyW, bodyH);
+    }
+
+    // 价格标签
+    ctx.font = "10px -apple-system, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#e33232";
+    ctx.fillText(maxP.toFixed(2), labelW - 4, priceToY(maxP));
+    ctx.fillStyle = "#00a750";
+    ctx.fillText(minP.toFixed(2), labelW - 4, priceToY(minP));
+
+    // 最新价标签
+    const lastC = candles[n - 1];
+    const lastY = priceToY(lastC.close);
+    const lastColor = lastC.close >= lastC.open ? "#e33232" : "#00a750";
+    const lastLabel = lastC.close.toFixed(2);
+    ctx.fillStyle = lastColor;
+    ctx.textAlign = "left";
+    const lx = Math.min(labelW + (n - 1) * cw + cw / 2 + 4, cssW - padR - 30);
+    const tw = ctx.measureText(lastLabel).width + 6;
+    ctx.fillRect(lx - 1, lastY - 7, tw, 14);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(lastLabel, lx + 2, lastY);
+
+    // 更新时间标签
+    const timeStartEl = card.querySelector(".sqc-time-start");
+    const timeEndEl = card.querySelector(".sqc-time-end");
+    if (timeStartEl && candles[0]) timeStartEl.textContent = candles[0].date;
+    if (timeEndEl && candles[n - 1]) timeEndEl.textContent = candles[n - 1].date;
+
+    chartWrap.style.display = "block";
     if (card._lastRect) positionCard(card._lastRect);
   }
 
