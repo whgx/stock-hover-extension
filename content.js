@@ -83,10 +83,12 @@
         <span class="sqc-tab" data-tab="news">公告</span>
       </div>
       <div class="sqc-tab-panel active" data-panel="quote">
+        <div class="sqc-version-tag">📋 v4.1-chart · build-0709</div>
         <div class="sqc-body">
           <div class="sqc-loading">查询中…</div>
         </div>
         <div class="sqc-chart-wrap" style="display:none;">
+          <div class="sqc-chart-status" style="font-size:10px;color:#999;padding:2px 8px;">图表加载中…</div>
           <div class="sqc-chart-tabs">
             <span class="sqc-chart-tab active" data-ct="trend">分时</span>
             <span class="sqc-chart-tab" data-ct="kline">日K</span>
@@ -345,6 +347,11 @@
 
     // 拉取分时图（只要有 secid 就加载，preClose 可为空）
     if (data.secid) {
+      // 先显示图表区域 + 加载提示
+      const chartWrap = card.querySelector(".sqc-chart-wrap");
+      const chartStatus = card.querySelector(".sqc-chart-status");
+      if (chartWrap) chartWrap.style.display = "block";
+      if (chartStatus) chartStatus.textContent = "📡 正在获取分时数据…";
       loadTrendChart(data.secid, data.preClose || data.price || 0);
     }
   }
@@ -519,7 +526,12 @@
       { action: "getTrend", secid },
       (resp) => {
         if (!card) return; // 卡片可能已关闭
-        if (!resp || !resp.success || !resp.data) return;
+        const chartStatus = card.querySelector(".sqc-chart-status");
+        if (!resp || !resp.success || !resp.data) {
+          if (chartStatus) chartStatus.textContent = "⚠️ 分时数据获取失败（非交易时段或接口异常）";
+          return;
+        }
+        if (chartStatus) chartStatus.textContent = "";
         drawTrend(resp.data, preClose);
       }
     );
@@ -672,11 +684,17 @@
 
   // ── 迷你 K线图 ──────────────────────────────────────
   function loadKlineChart(secid) {
+    const chartStatus = card.querySelector(".sqc-chart-status");
+    if (chartStatus) chartStatus.textContent = "📡 正在获取K线数据…";
     safeSendMessage(
       { action: "getKline", secid, count: 60, period: 101 },
       (resp) => {
         if (!card) return;
-        if (!resp || !resp.success || !resp.data || !resp.data.candles || resp.data.candles.length < 2) return;
+        if (!resp || !resp.success || !resp.data || !resp.data.candles || resp.data.candles.length < 2) {
+          if (chartStatus) chartStatus.textContent = "⚠️ K线数据获取失败（接口异常或数据不足）";
+          return;
+        }
+        if (chartStatus) chartStatus.textContent = "";
         drawKlineMini(resp.data.candles);
       }
     );

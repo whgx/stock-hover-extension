@@ -167,6 +167,14 @@
 }
 
 /* ── 分时图区域 ───────────────────────────────────── */
+#stock-quote-card .sqc-version-tag {
+  font-size: 9px;
+  color: #339af0;
+  padding: 3px 14px 0;
+  letter-spacing: 0.3px;
+  background: rgba(51,154,240,0.05);
+}
+
 #stock-quote-card .sqc-chart-wrap {
   padding: 0 6px 4px;
 }
@@ -655,6 +663,11 @@
 
   #stock-quote-card .sqc-pos-set {
     background: #1c7ed6;
+  }
+
+  #stock-quote-card .sqc-version-tag {
+    color: #4dabf7;
+    background: rgba(77,171,247,0.08);
   }
 
   #stock-quote-card .sqc-tabs {
