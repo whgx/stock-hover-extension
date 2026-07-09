@@ -196,8 +196,7 @@ async function fetchTrendData(secid) {
     "&ndays=1&iscr=0&secid=" + secid;
 
   try {
-    const resp = await fetch(url);
-    const json = await resp.json();
+    const json = await fetchWithHeaders(url);
     const trends = json?.data?.trends ?? [];
     if (trends.length === 0) return null;
 
@@ -624,12 +623,22 @@ async function getPortfolioQuotes() {
 // 14. K线数据（日K + 均线）
 // ════════════════════════════════════════════════════════════
 async function fetchKlineData(secid, count = 120, period = 101) {
+  // 计算 beg 起始日期：日K取半年前，周K取2年前，月K取5年前
+  const now = new Date();
+  const begDate = new Date(now);
+  if (period === 101) begDate.setMonth(now.getMonth() - 8);       // 日K：8个月前
+  else if (period === 102) begDate.setFullYear(now.getFullYear() - 3); // 周K：3年前
+  else begDate.setFullYear(now.getFullYear() - 8);                  // 月K：8年前
+  const begStr = begDate.getFullYear() + String(begDate.getMonth() + 1).padStart(2, "0") + "01";
+  const endStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0");
+
   const url =
     "https://push2his.eastmoney.com/api/qt/stock/kline/get?" +
     "ut=fa5fd1943c7b386f172d6893dbfd32" +
     "&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13" +
     "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61" +
     "&klt=" + period + "&fqt=1&secid=" + secid +
+    "&beg=" + begStr + "&end=" + endStr +
     "&lmt=" + count;
 
   try {
