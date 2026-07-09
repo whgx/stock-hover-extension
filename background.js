@@ -218,7 +218,7 @@ async function fetchTrendData(secid) {
     };
   } catch (e) {
     console.error("[行情助手] 分时数据获取失败:", e);
-    return null;
+    return { error: e.message };
   }
 }
 
@@ -1205,7 +1205,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // ── 获取分时数据 ──
       case "getTrend": {
         const trend = await fetchTrendData(request.secid);
-        if (!trend) return { success: false, error: "无分时数据" };
+        if (!trend) return { success: false, error: "无分时数据(返回null)" };
+        if (trend.error) return { success: false, error: "分时异常: " + trend.error };
+        if (!trend.points || trend.points.length === 0) return { success: false, error: "分时数据为空" };
         return { success: true, data: trend };
       }
 

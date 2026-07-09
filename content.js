@@ -83,7 +83,7 @@
         <span class="sqc-tab" data-tab="news">公告</span>
       </div>
       <div class="sqc-tab-panel active" data-panel="quote">
-        <div class="sqc-version-tag">📋 v4.1-chart · build-0709</div>
+        <div class="sqc-version-tag">📋 v4.2-chart · build-0709b</div>
         <div class="sqc-body">
           <div class="sqc-loading">查询中…</div>
         </div>
@@ -528,7 +528,8 @@
         if (!card) return; // 卡片可能已关闭
         const chartStatus = card.querySelector(".sqc-chart-status");
         if (!resp || !resp.success || !resp.data) {
-          if (chartStatus) chartStatus.textContent = "⚠️ 分时数据获取失败（非交易时段或接口异常）";
+          const errMsg = (resp && resp.error) ? resp.error : "未知错误";
+          if (chartStatus) chartStatus.textContent = "⚠️ " + errMsg;
           return;
         }
         if (chartStatus) chartStatus.textContent = "";
@@ -691,7 +692,8 @@
       (resp) => {
         if (!card) return;
         if (!resp || !resp.success || !resp.data || !resp.data.candles || resp.data.candles.length < 2) {
-          if (chartStatus) chartStatus.textContent = "⚠️ K线数据获取失败（接口异常或数据不足）";
+          const errMsg = (resp && resp.error) ? resp.error : "接口异常或数据不足";
+          if (chartStatus) chartStatus.textContent = "⚠️ K线: " + errMsg;
           return;
         }
         if (chartStatus) chartStatus.textContent = "";
