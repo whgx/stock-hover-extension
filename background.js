@@ -642,8 +642,7 @@ async function fetchKlineData(secid, count = 120, period = 101) {
     "&lmt=" + count;
 
   try {
-    const resp = await fetchWithHeaders(url);
-    const json = await resp.json();
+    const json = await fetchWithHeaders(url);
     const klines = json?.data?.klines ?? [];
     if (klines.length === 0) return null;
 
